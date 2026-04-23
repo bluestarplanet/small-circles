@@ -37,6 +37,8 @@ textarea{resize:vertical;min-height:72px;}
 .tile{border-radius:10px;padding:12px 14px;flex:1;text-align:center;}
 .si{background:#FDFAF4;border:1px solid #E2D8CC;border-radius:24px;padding:9px 16px;font-size:13px;font-family:'Inter',sans-serif;color:#241E18;outline:none;width:100%;}
 .si:focus{border-color:#C5B59A;}
+.icon-btn{background:transparent;border:none;cursor:pointer;padding:4px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;opacity:0.45;transition:opacity 0.15s;}
+.icon-btn:hover{opacity:0.85;}
 </style>
 </head>
 <body>
@@ -58,22 +60,33 @@ const STATUS={
   echo:{key:'echo',label:'Echo',desc:'Past client'},
   relay:{key:'relay',label:'Relay',desc:'Referral source'},
 };
+const SOURCES=['SOI','Open House','Referral','Social Media','Networking Event','Door Knocking','Farm','Other'];
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 const todayStr=()=>new Date().toISOString().split('T')[0];
 const addDays=(str,n)=>{const d=new Date((str||todayStr())+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().split('T')[0];};
 const daysUntil=str=>str?Math.round((new Date(str+'T00:00:00')-new Date(todayStr()+'T00:00:00'))/86400000):null;
 const fmtDate=str=>str?new Date(str+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
 const uid=()=>Math.random().toString(36).slice(2,10);
+
 const parseBday=str=>{
   if(!str)return null;
-  const months=['january','february','march','april','may','june','july','august','september','october','november','december'];
   const parts=str.trim().toLowerCase().split(/[\s,]+/);
   if(parts.length<2)return null;
-  const mi=months.indexOf(parts[0]);const day=parseInt(parts[1]);
+  const mi=MONTHS.map(m=>m.toLowerCase()).indexOf(parts[0]);
+  const day=parseInt(parts[1]);
   if(mi===-1||isNaN(day))return null;
   const now=new Date();const d=new Date(now.getFullYear(),mi,day);
   if(d<now)d.setFullYear(now.getFullYear()+1);
   return d;
+};
+const parseBdayParts=str=>{
+  if(!str)return['',''];
+  const parts=str.trim().toLowerCase().split(/[\s,]+/);
+  if(parts.length<2)return['',''];
+  const mi=MONTHS.map(m=>m.toLowerCase()).indexOf(parts[0]);
+  if(mi===-1)return['',''];
+  return[MONTHS[mi],parts[1]];
 };
 const bdayIn14=str=>{const d=parseBday(str);if(!d)return false;const diff=(d-new Date())/86400000;return diff>=0&&diff<=14;};
 const bdayDays=str=>{const d=parseBday(str);if(!d)return null;return Math.max(0,Math.round((d-new Date())/86400000));};
@@ -84,7 +97,8 @@ const mk=(fn,ln,ph,em,src,lc,meth,res,na,bn,notes,met,starter)=>({
   bn:bn||'',notes:notes||'',
   freq:src==='Open House'?'phase':'flow',
   status:bn?'signal':'static',
-  birthday:'',starter:starter||'',log:[]
+  birthday:'',starter:starter||'',log:[],
+  addr1:'',city:'',state:'',zip:'',
 });
 
 const DEFAULTS=[
@@ -182,32 +196,58 @@ const DEFAULTS=[
   mk('Valerie','Steighner','(818) 983-9799','vsteighner@gmail.com','SOI','','','','Email'),
   mk('Victoire','Charles','(646) 221-4049','','SOI','','','','Call'),
   mk('Yorlin','Madera','(323) 839-3735','','SOI','','','','Call'),
-  mk('Chris','Clay','(484) 695-5870','csclay5112@gmail.com','Open House','','','','Call','','Young couple, planning to elope. Father\'s name is Lloyd (asked for your card).','','Young couple eloping — Dad is Lloyd, he asked for your card'),
-  mk('Jef','Cohen','','jeff@gethighfly.com','Open House','','','','Email','','Lives in Oregon, wants to be closer to kids. Microsoft 35 years. Daughter works at Cedars.','','Oregon to LA — wants to be near kids, 35 yrs at Microsoft'),
-  mk('Joni','Allen','(323) 692-1491','jonisweetie@gmail.com','Open House','','','','Call','','Friend of Roy Stone (frame shop). Boyfriend of John Waite (rock star). May remodel instead of buy.','','May remodel instead of buy — keep nurturing'),
-  mk('Jeffery','Zaeder','','jzaeder@gmail.com','Open House','','','','Email','','Jeff and Isabella. German Shepherd and cat. Isabella writes mysteries. Dipping their toe in the market.','','Isabella writes mysteries — ask how the search is going'),
+  mk('Chris','Clay','(484) 695-5870','csclay5112@gmail.com','Open House','','','','Call','','Young couple, planning to elope. Father\'s name is Lloyd.','','Young couple eloping — Dad is Lloyd, he asked for your card'),
+  mk('Jef','Cohen','','jeff@gethighfly.com','Open House','','','','Email','','Lives in Oregon, wants to be closer to kids. Microsoft 35 years.','','Oregon to LA — wants to be near kids, 35 yrs at Microsoft'),
+  mk('Joni','Allen','(323) 692-1491','jonisweetie@gmail.com','Open House','','','','Call','','Friend of Roy Stone. Boyfriend of John Waite. May remodel instead of buy.','','May remodel instead of buy — keep nurturing'),
+  mk('Jeffery','Zaeder','','jzaeder@gmail.com','Open House','','','','Email','','Jeff and Isabella. German Shepherd and cat. Isabella writes mysteries.','','Isabella writes mysteries — ask how the search is going'),
   mk('Jeff & Katie','Dunn','(203) 982-1162','katielepi@gmail.com','Open House','','','','Call','5000000','Jeff, Safety VP at Hinge. Katie, massage therapist. Budget up to $5M.','','Safety VP at Hinge + massage therapist — budget up to $5M'),
-  mk('Kevin','Chen','(559) 360-8586','kevinchen2991@gmail.com','Open House','','','','Call','','Investor in consumer companies. Girlfriend\'s mom is a realtor from Mass. He\'s from Fresno.','','Consumer company investor — check on progress'),
-  mk('Krysta & William','Buck','(714) 337-2007','klfauria@gmail.com','Open House','','','','Call','','She\'s an AP reporter. Looking again after a year break. Currently live near downtown.','','AP reporter — back after a year break from searching'),
+  mk('Kevin','Chen','(559) 360-8586','kevinchen2991@gmail.com','Open House','','','','Call','','Investor in consumer companies. From Fresno.','','Consumer company investor — check on progress'),
+  mk('Krysta & William','Buck','(714) 337-2007','klfauria@gmail.com','Open House','','','','Call','','AP reporter. Looking again after a year break.','','AP reporter — back after a year break from searching'),
   mk('Mahmood','Jeewa','','mahmoodjeewa123@gmail.com','Open House','','','','Email','','In talks with a few agents.','','In talks with other agents — move quickly'),
   mk('Henry','Maroney','','maroneyhenry@gmail.com','Open House','','','','Email','','Surname is English, not Irish.','','Note: surname is English, not Irish'),
-  mk('Merri','McArthur','','merri.mcarthur@hotmail.com','Open House','','','','Email','','Retired artist, former stage manager, set designer. Looking to age in place. LOTR fan.','','LOTR fan — looking to age in place'),
+  mk('Merri','McArthur','','merri.mcarthur@hotmail.com','Open House','','','','Email','','Retired artist, stage manager, set designer. LOTR fan.','','LOTR fan — looking to age in place'),
   mk('Pamela','Rhett','(424) 332-2660','pamelarhett@yahoo.com','Open House','','','','Call','3000000','From South Carolina. Budget up to $3M. Cool yellow nails.','','From South Carolina — $3M budget, remember the yellow nails'),
-  mk('Rick','Egusquiza','','ricke410@gmail.com','Open House','','','','Email','','Hector (partner), writer from Newark NJ, writes for celeb mags.','','Hector is his partner — writer, Newark NJ'),
-  mk('Sara','Kelman','','sarakelman@icloud.com','Open House','','','','Email','','Went to school with Zara at Santa Monica HS. Married to high school sweetheart.','','Santa Monica HS connection — married her high school sweetheart'),
-  mk('Sunny','Park','(347) 344-8385','shopping.sypnyc@gmail.com','Open House','','','','Call','','Just starting to look. Sent list of lenders. Works in Culver City.','','Just starting — sent lender list, works in Culver City'),
+  mk('Rick','Egusquiza','','ricke410@gmail.com','Open House','','','','Email','','Hector (partner), writer from Newark NJ.','','Hector is his partner — writer, Newark NJ'),
+  mk('Sara','Kelman','','sarakelman@icloud.com','Open House','','','','Email','','Went to school with Zara at Santa Monica HS.','','Santa Monica HS connection — married her high school sweetheart'),
+  mk('Sunny','Park','(347) 344-8385','shopping.sypnyc@gmail.com','Open House','','','','Call','','Just starting to look. Sent list of lenders.','','Just starting — sent lender list, works in Culver City'),
   mk('Chunhou','Li','(213) 378-9183','yaluminoid@gmail.com','Open House','','','','Call','650000','Couple, first-time buyers. Purchased the Lawler condo at $650K.','','Purchased the Lawler condo — check in post-close'),
-  mk('Cassie','Wang','(765) 426-6196','','Open House','','','','Call','1200000','Widower, 3 children including twins. Prefers walkability. Up to $1.2M.','','Widower, 3 kids (twins!) — walkable neighborhood, up to $1.2M'),
+  mk('Cassie','Wang','(765) 426-6196','','Open House','','','','Call','1200000','Widower, 3 children including twins. Up to $1.2M.','','Widower, 3 kids (twins!) — walkable neighborhood, up to $1.2M'),
   mk('Dave','X','(310) 924-5498','','Open House','','','','Call','','Lawyer (2 years).','','Lawyer, 2 years in — check on search timeline'),
-  mk('Gigi','Zang','(310) 913-8371','','Open House','','','','Call','1500000','Triplex owner, 1031 exchange(?). Husband owns 2 houses in Mar Vista.','','1031 exchange? Husband has 2 Mar Vista houses — born and raised'),
+  mk('Gigi','Zang','(310) 913-8371','','Open House','','','','Call','1500000','Triplex owner, 1031 exchange(?). Husband owns 2 houses in Mar Vista.','','1031 exchange? Husband has 2 Mar Vista houses'),
   mk('Lorena','Brockway','(310) 259-9869','','Open House','','','','Call','1700000','Pediatric Hospitalist. 1.7 max. 3 bed/2 bath, ADU, yard.','','Pediatric Hospitalist — 3/2, ADU, yard, $1.7M max'),
   mk('Roxanne','Nguyen','(949) 501-9401','','Open House','','','','Call'),
   mk('Kerry','Newman','(310) 804-9428','kerrylindsaynewman@yahoo.com','Open House','','','','Call'),
 ];
 
-const STORAGE_KEY='sc-v1';
+const STORAGE_KEY='sc-v4';
 const load=()=>{try{const d=localStorage.getItem(STORAGE_KEY);return d?JSON.parse(d):null;}catch{return null;}};
 const save=d=>{try{localStorage.setItem(STORAGE_KEY,JSON.stringify(d));}catch{}};
+
+function BdayPicker({value,onChange}){
+  const [month,dayStr]=parseBdayParts(value);
+  const daysInMonth=month?new Date(2000,MONTHS.indexOf(month)+1,0).getDate():31;
+  const hMonth=m=>{
+    if(!m){onChange('');return;}
+    const d=dayStr||'1';
+    onChange(`${m} ${d}`);
+  };
+  const hDay=d=>{
+    if(!d||!month){return;}
+    onChange(`${month} ${d}`);
+  };
+  return(
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+      <select value={month||''} onChange={e=>hMonth(e.target.value)}>
+        <option value="">Month</option>
+        {MONTHS.map(m=><option key={m} value={m}>{m}</option>)}
+      </select>
+      <select value={dayStr||''} onChange={e=>hDay(e.target.value)} disabled={!month}>
+        <option value="">Day</option>
+        {Array.from({length:daysInMonth},(_,i)=><option key={i+1} value={String(i+1)}>{i+1}</option>)}
+      </select>
+    </div>
+  );
+}
 
 function Pulsar({size=80,color='#C9A870',animate=false}){
   const cx=80,cy=80,outer=52,circles=[22,36,52],lens=[22,16,11];
@@ -397,15 +437,82 @@ function List({contacts,freqFilter,onOpen,onQL,logged,onAdd}){
   );
 }
 
-function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
-  const [f,setF]=useState({...contact});
+function NotesLog({log,onUpdate}){
   const [note,setNote]=useState('');
+  const [editing,setEditing]=useState(null);
+  const [editText,setEditText]=useState('');
+  const [delConfirm,setDelConfirm]=useState(null);
+
+  const addNote=()=>{
+    if(!note.trim())return;
+    onUpdate([{text:note.trim(),date:todayStr()},...(log||[])]);
+    setNote('');
+  };
+  const startEdit=(i,text)=>{setEditing(i);setEditText(text);};
+  const saveEdit=i=>{
+    const next=[...(log||[])];
+    next[i]={...next[i],text:editText.trim()};
+    onUpdate(next);setEditing(null);
+  };
+  const deleteNote=i=>{
+    onUpdate((log||[]).filter((_,idx)=>idx!==i));
+    setDelConfirm(null);
+  };
+
+  return(
+    <div style={{marginBottom:18}}>
+      <span className="sl">Notes Log</span>
+      <div style={{display:'flex',gap:8,marginBottom:12}}>
+        <textarea placeholder="Add a note… then tap the + button" value={note} onChange={e=>setNote(e.target.value)} style={{flex:1,minHeight:60}}/>
+        <button onClick={addNote} style={{background:'#16293D',color:'#F6F1E9',border:'none',borderRadius:8,width:40,cursor:'pointer',fontSize:20,display:'flex',alignItems:'center',justifyContent:'center',alignSelf:'flex-end',height:42,flexShrink:0}}>+</button>
+      </div>
+      {(log||[]).length===0&&<div style={{color:'#9E9288',fontSize:12,fontStyle:'italic',textAlign:'center',padding:'10px 0'}}>No entries yet</div>}
+      {(log||[]).map((e,i)=>(
+        <div key={i} style={{background:'#F0EDE7',borderRadius:8,padding:'10px 12px',marginBottom:8}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+            <span style={{fontSize:10.5,color:'#9E9288'}}>{fmtDate(e.date)}</span>
+            <div style={{display:'flex',gap:2}}>
+              <button className="icon-btn" onClick={()=>startEdit(i,e.text)} title="Edit">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5E5248" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </button>
+              {delConfirm===i?(
+                <div style={{display:'flex',gap:4,alignItems:'center'}}>
+                  <button onClick={()=>deleteNote(i)} style={{background:'#B03030',color:'#fff',border:'none',borderRadius:4,padding:'2px 8px',fontSize:10,cursor:'pointer'}}>Delete</button>
+                  <button onClick={()=>setDelConfirm(null)} style={{background:'transparent',border:'1px solid #C5B59A',color:'#5E5248',borderRadius:4,padding:'2px 8px',fontSize:10,cursor:'pointer'}}>Cancel</button>
+                </div>
+              ):(
+                <button className="icon-btn" onClick={()=>setDelConfirm(i)} title="Delete">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5E5248" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                </button>
+              )}
+            </div>
+          </div>
+          {editing===i?(
+            <div>
+              <textarea value={editText} onChange={e=>setEditText(e.target.value)} style={{minHeight:60,marginBottom:6}}/>
+              <div style={{display:'flex',gap:6}}>
+                <button onClick={()=>saveEdit(i)} style={{background:'#16293D',color:'#F6F1E9',border:'none',borderRadius:6,padding:'5px 14px',fontSize:12,cursor:'pointer'}}>Save</button>
+                <button onClick={()=>setEditing(null)} style={{background:'transparent',border:'1px solid #C5B59A',color:'#5E5248',borderRadius:6,padding:'5px 14px',fontSize:12,cursor:'pointer'}}>Cancel</button>
+              </div>
+            </div>
+          ):(
+            <div style={{fontSize:13,color:'#241E18',lineHeight:1.5}}>{e.text}</div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
+  const [f,setF]=useState({addr1:'',city:'',state:'',zip:'',...contact});
   const [saved,setSaved]=useState(false);
   const [cdel,setCdel]=useState(false);
+  const [addrOpen,setAddrOpen]=useState(!!(contact.addr1||contact.city));
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   const hFreq=k=>{const days=FREQ[k]?.days;set('freq',k);if(days)set('nad',addDays(todayStr(),days));};
   const hSave=()=>{onSave(f);setSaved(true);setTimeout(()=>setSaved(false),2000);};
-  const addNote=()=>{if(!note.trim())return;set('log',[{text:note.trim(),date:todayStr()},...(f.log||[])]);setNote('');};
+
   return(
     <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
       <div style={{background:'#16293D',padding:'14px 18px',flexShrink:0,display:'flex',alignItems:'center',gap:14}}>
@@ -436,12 +543,25 @@ function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
             <input placeholder="Email" value={f.em||''} onChange={e=>set('em',e.target.value)} style={{flex:1}}/>
             {f.em&&<a href={`mailto:${f.em}`} style={{color:'#5C8FB5',fontSize:18,textDecoration:'none',flexShrink:0}}>✉</a>}
           </div>
+          {addrOpen?(
+            <div style={{marginBottom:10}}>
+              <input placeholder="Street address" value={f.addr1||''} onChange={e=>set('addr1',e.target.value)} style={{marginBottom:8}}/>
+              <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr',gap:8}}>
+                <input placeholder="City" value={f.city||''} onChange={e=>set('city',e.target.value)}/>
+                <input placeholder="State" value={f.state||''} onChange={e=>set('state',e.target.value)}/>
+                <input placeholder="ZIP" value={f.zip||''} onChange={e=>set('zip',e.target.value)}/>
+              </div>
+              <button onClick={()=>setAddrOpen(false)} style={{background:'transparent',border:'none',color:'#9E9288',fontSize:11,cursor:'pointer',marginTop:6,padding:0,textDecoration:'underline',opacity:0.6}}>Hide address</button>
+            </div>
+          ):(
+            <button onClick={()=>setAddrOpen(true)} style={{background:'transparent',border:'none',color:'#9E9288',fontSize:11,cursor:'pointer',padding:0,textDecoration:'underline',opacity:0.6,marginBottom:10,display:'block'}}>+ Add address</button>
+          )}
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
             <input placeholder="First met" value={f.met||''} onChange={e=>set('met',e.target.value)}/>
             <input placeholder="Budget" value={f.bn||''} onChange={e=>set('bn',e.target.value)}/>
           </div>
           <select value={f.src||'SOI'} onChange={e=>set('src',e.target.value)} style={{marginBottom:10}}>
-            <option value="SOI">SOI</option><option value="Open House">Open House</option>
+            {SOURCES.map(s=><option key={s} value={s}>{s}</option>)}
           </select>
           <textarea placeholder="Notes…" value={f.notes||''} onChange={e=>set('notes',e.target.value)}/>
         </Fld>
@@ -462,8 +582,12 @@ function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
           </div>
         </Fld>
         <Fld label="Personal">
-          <input placeholder='Birthday (e.g. "March 15")' value={f.birthday||''} onChange={e=>set('birthday',e.target.value)} style={{marginBottom:10}}/>
-          <input placeholder="Conversation starter…" value={f.starter||''} onChange={e=>set('starter',e.target.value)}/>
+          <div style={{marginBottom:10}}>
+            <span className="sl" style={{marginBottom:6}}>Birthday</span>
+            <BdayPicker value={f.birthday||''} onChange={v=>set('birthday',v)}/>
+          </div>
+          <span className="sl" style={{marginBottom:6}}>Conversation Starter</span>
+          <input placeholder="A short note visible on the contact card…" value={f.starter||''} onChange={e=>set('starter',e.target.value)}/>
         </Fld>
         <Fld label="Scheduling">
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
@@ -478,19 +602,7 @@ function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
             <input placeholder="Result" value={f.res||''} onChange={e=>set('res',e.target.value)}/>
           </div>
         </Fld>
-        <Fld label="Notes Log">
-          <div style={{display:'flex',gap:8,marginBottom:12}}>
-            <textarea placeholder="Add a note…" value={note} onChange={e=>setNote(e.target.value)} style={{flex:1,minHeight:60}}/>
-            <button onClick={addNote} style={{background:'#16293D',color:'#F6F1E9',border:'none',borderRadius:8,width:40,cursor:'pointer',fontSize:20,display:'flex',alignItems:'center',justifyContent:'center',alignSelf:'flex-end',height:42,flexShrink:0}}>+</button>
-          </div>
-          {(f.log||[]).length===0&&<div style={{color:'#9E9288',fontSize:12,fontStyle:'italic',textAlign:'center',padding:'10px 0'}}>No entries yet</div>}
-          {(f.log||[]).map((e,i)=>(
-            <div key={i} style={{background:'#F0EDE7',borderRadius:8,padding:'10px 12px',marginBottom:8}}>
-              <div style={{fontSize:10.5,color:'#9E9288',marginBottom:4}}>{fmtDate(e.date)}</div>
-              <div style={{fontSize:13,color:'#241E18',lineHeight:1.5}}>{e.text}</div>
-            </div>
-          ))}
-        </Fld>
+        <NotesLog log={f.log||[]} onUpdate={v=>set('log',v)}/>
         <button className={`sv${saved?' ok':''}`} onClick={hSave}>{saved?'✓ Saved':'Save Changes'}</button>
         <div style={{textAlign:'center',marginTop:22}}>
           {cdel?(
@@ -509,13 +621,14 @@ function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
 }
 
 function Add({onSave,onBack}){
-  const [f,setF]=useState({id:uid(),fn:'',ln:'',ph:'',em:'',src:'SOI',met:todayStr(),lc:'',meth:'',res:'',na:'',nad:'',bn:'',notes:'',freq:'flow',status:'static',birthday:'',starter:'',log:[]});
+  const [f,setF]=useState({id:uid(),fn:'',ln:'',ph:'',em:'',src:'SOI',met:todayStr(),lc:'',meth:'',res:'',na:'',nad:'',bn:'',notes:'',freq:'flow',status:'static',birthday:'',starter:'',log:[],addr1:'',city:'',state:'',zip:''});
+  const [addrOpen,setAddrOpen]=useState(false);
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   const hFreq=k=>{const days=FREQ[k]?.days;set('freq',k);if(days)set('nad',addDays(todayStr(),days));};
   return(
     <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
       <div style={{background:'#16293D',padding:'14px 18px',flexShrink:0,display:'flex',alignItems:'center',gap:12}}>
-        <button onClick={onBack} style={{background:'transparent',border:'none',color:'#C9A870',fontSize:24,cursor:'pointer',lineHeight:1,padding:'0 4px'}}>‹</button>
+        <button onClick={onBack} style={{background:'rgba(110,97,88,0.2)',border:'1px solid rgba(110,97,88,0.45)',borderRadius:'50%',width:32,height:32,cursor:'pointer',color:'#9E9288',fontSize:14,display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
         <div style={{fontFamily:'Cormorant Garamond',fontSize:22,fontWeight:400,color:'#F6F1E9'}}>New Contact</div>
       </div>
       <div style={{flex:1,overflowY:'auto',padding:'18px 16px 40px'}}>
@@ -527,15 +640,25 @@ function Add({onSave,onBack}){
         </Fld>
         <Fld label="Contact">
           <input placeholder="Phone" value={f.ph} onChange={e=>set('ph',e.target.value)} style={{marginBottom:10}}/>
-          <input placeholder="Email" value={f.em} onChange={e=>set('em',e.target.value)}/>
+          <input placeholder="Email" value={f.em} onChange={e=>set('em',e.target.value)} style={{marginBottom:10}}/>
+          {addrOpen?(
+            <div>
+              <input placeholder="Street address" value={f.addr1} onChange={e=>set('addr1',e.target.value)} style={{marginBottom:8}}/>
+              <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr',gap:8,marginBottom:8}}>
+                <input placeholder="City" value={f.city} onChange={e=>set('city',e.target.value)}/>
+                <input placeholder="State" value={f.state} onChange={e=>set('state',e.target.value)}/>
+                <input placeholder="ZIP" value={f.zip} onChange={e=>set('zip',e.target.value)}/>
+              </div>
+              <button onClick={()=>setAddrOpen(false)} style={{background:'transparent',border:'none',color:'#9E9288',fontSize:11,cursor:'pointer',padding:0,textDecoration:'underline',opacity:0.6,marginBottom:10,display:'block'}}>Hide address</button>
+            </div>
+          ):(
+            <button onClick={()=>setAddrOpen(true)} style={{background:'transparent',border:'none',color:'#9E9288',fontSize:11,cursor:'pointer',padding:0,textDecoration:'underline',opacity:0.6,marginBottom:0,display:'block'}}>+ Add address</button>
+          )}
         </Fld>
         <Fld label="Source">
-          <div style={{display:'flex',gap:8}}>
-            {['SOI','Open House'].map(s=>(
-              <button key={s} className="pill" onClick={()=>set('src',s)}
-                style={{color:f.src===s?'#243C58':'#5E5248',background:f.src===s?'#C4D9EE':'transparent',borderColor:f.src===s?'#5C8FB5':'#C5B59A'}}>{s}</button>
-            ))}
-          </div>
+          <select value={f.src} onChange={e=>set('src',e.target.value)}>
+            {SOURCES.map(s=><option key={s} value={s}>{s}</option>)}
+          </select>
         </Fld>
         <Fld label="Frequency">
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
@@ -554,8 +677,12 @@ function Add({onSave,onBack}){
           </div>
         </Fld>
         <Fld label="Personal">
-          <input placeholder='Birthday (e.g. "March 15")' value={f.birthday} onChange={e=>set('birthday',e.target.value)} style={{marginBottom:10}}/>
-          <input placeholder="Conversation starter…" value={f.starter} onChange={e=>set('starter',e.target.value)}/>
+          <div style={{marginBottom:10}}>
+            <span className="sl" style={{marginBottom:6}}>Birthday</span>
+            <BdayPicker value={f.birthday} onChange={v=>set('birthday',v)}/>
+          </div>
+          <span className="sl" style={{marginBottom:6}}>Conversation Starter</span>
+          <input placeholder="A short note visible on the contact card…" value={f.starter} onChange={e=>set('starter',e.target.value)}/>
         </Fld>
         <Fld label="Notes">
           <textarea placeholder="Notes…" value={f.notes} onChange={e=>set('notes',e.target.value)}/>
@@ -694,8 +821,7 @@ function App(){
             onBack={()=>setScreen(prev==='detail'?'dashboard':prev)}
             onNext={()=>nextContact&&setSid(nextContact.id)}
             onPrev={()=>prevContact&&setSid(prevContact.id)}
-            hasNext={!!nextContact}
-            hasPrev={!!prevContact}/>;
+            hasNext={!!nextContact} hasPrev={!!prevContact}/>;
         })()}
         {screen==='add'&&(
           <Add onSave={data=>{saveContact(data);setFf(null);setNav('all');setScreen('list');}}
