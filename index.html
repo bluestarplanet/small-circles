@@ -238,11 +238,9 @@ const load=()=>{try{const d=localStorage.getItem(STORAGE_KEY);return d?JSON.pars
 const save=d=>{try{localStorage.setItem(STORAGE_KEY,JSON.stringify(d));}catch{}};
 
 function AnniversarySection({anniversaries,onChange}){
-  const [open,setOpen]=useState((anniversaries||[]).length>0);
   const add=()=>{
     if((anniversaries||[]).length>=6)return;
     onChange([...(anniversaries||[]),{date:'',note:''}]);
-    setOpen(true);
   };
   const upd=(i,k,v)=>{
     const next=[...(anniversaries||[])];
@@ -250,23 +248,17 @@ function AnniversarySection({anniversaries,onChange}){
     onChange(next);
   };
   const del=i=>onChange((anniversaries||[]).filter((_,idx)=>idx!==i));
-  if(!open)return(
-    <div style={{marginBottom:18}}>
-      <button onClick={add} style={{background:'transparent',border:'none',color:'#9E9288',fontSize:11,cursor:'pointer',padding:0,textDecoration:'underline',opacity:0.6,display:'block'}}>+ Add anniversary</button>
-    </div>
-  );
   return(
     <div style={{marginBottom:18}}>
-      <span className="sl">Anniversaries</span>
       {(anniversaries||[]).map((a,i)=>(
         <div key={i} style={{display:'grid',gridTemplateColumns:'1fr 1fr auto',gap:8,marginBottom:8,alignItems:'center'}}>
           <input type="date" value={a.date||''} onChange={e=>upd(i,'date',e.target.value)}/>
-          <input placeholder="Note (e.g. Closed on Maple St.)" value={a.note||''} onChange={e=>upd(i,'note',e.target.value)}/>
+          <input placeholder="e.g. Closed on Maple St." value={a.note||''} onChange={e=>upd(i,'note',e.target.value)}/>
           <button onClick={()=>del(i)} style={{background:'transparent',border:'none',cursor:'pointer',color:'#9E9288',fontSize:16,opacity:0.45,padding:'0 4px',flexShrink:0}} title="Remove">×</button>
         </div>
       ))}
       {(anniversaries||[]).length<6&&(
-        <button onClick={add} style={{background:'transparent',border:'none',color:'#9E9288',fontSize:11,cursor:'pointer',padding:0,textDecoration:'underline',opacity:0.6,display:'block',marginTop:4}}>+ Add another</button>
+        <button onClick={add} style={{background:'transparent',border:'none',color:'#9E9288',fontSize:11,cursor:'pointer',padding:0,textDecoration:'underline',opacity:0.6,display:'block'}}>+ Add anniversary</button>
       )}
     </div>
   );
@@ -486,7 +478,7 @@ function NotesLog({log,onUpdate}){
     <div style={{marginBottom:18}}>
       <span className="sl">Notes Log</span>
       <div style={{display:'flex',gap:8,marginBottom:12}}>
-        <textarea placeholder="Add a note… then tap the + button" value={note} onChange={e=>setNote(e.target.value)} style={{flex:1,minHeight:60}}/>
+        <textarea placeholder="Add a timestamped entry — what happened on this call, what they said, what changed…" value={note} onChange={e=>setNote(e.target.value)} style={{flex:1,minHeight:60}}/>
         <button onClick={addNote} style={{background:'#16293D',color:'#F6F1E9',border:'none',borderRadius:8,width:40,cursor:'pointer',fontSize:20,display:'flex',alignItems:'center',justifyContent:'center',alignSelf:'flex-end',height:42,flexShrink:0}}>+</button>
       </div>
       {(log||[]).length===0&&<div style={{color:'#9E9288',fontSize:12,fontStyle:'italic',textAlign:'center',padding:'10px 0'}}>No entries yet</div>}
@@ -586,7 +578,7 @@ function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
           <select value={f.src||'SOI'} onChange={e=>set('src',e.target.value)} style={{marginBottom:10}}>
             {SOURCES.map(s=><option key={s} value={s}>{s}</option>)}
           </select>
-          <textarea placeholder="Notes…" value={f.notes||''} onChange={e=>set('notes',e.target.value)}/>
+          <textarea placeholder="Background info — who they are, what you know, context that doesn't change much…" value={f.notes||''} onChange={e=>set('notes',e.target.value)}/>
         </Fld>
         <Fld label="Frequency">
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
