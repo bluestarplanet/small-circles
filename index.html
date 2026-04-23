@@ -606,7 +606,9 @@ function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
           <input type="date" value={f.birthday||''} onChange={e=>set('birthday',e.target.value)}/>
         </div>
         <AnniversarySection anniversaries={f.anniversaries||[]} onChange={v=>set('anniversaries',v)}/>
-        <hr style={{border:'none',borderTop:'1px solid #E2D8CC',margin:'4px 0 22px'}}/>
+        <div style={{display:'flex',justifyContent:'center',margin:'12px 0 24px'}}>
+          <div style={{width:'60%',borderTop:'1px solid #E2D8CC'}}/>
+        </div>
         <Fld label="Scheduling">
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
             <input type="date" value={f.nad||''} onChange={e=>set('nad',e.target.value)}/>
