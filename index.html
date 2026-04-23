@@ -71,6 +71,17 @@ const uid=()=>Math.random().toString(36).slice(2,10);
 
 const parseBday=str=>{
   if(!str)return null;
+  // handles both "YYYY-MM-DD" (new) and "March 15" (legacy)
+  if(str.includes('-')&&str.length>=8){
+    const parts=str.split('-');
+    if(parts.length===3){
+      const now=new Date();
+      const d=new Date(now.getFullYear(),parseInt(parts[1])-1,parseInt(parts[2]));
+      if(d<new Date(now.getFullYear(),now.getMonth(),now.getDate()))d.setFullYear(now.getFullYear()+1);
+      return d;
+    }
+  }
+  // legacy text format
   const parts=str.trim().toLowerCase().split(/[\s,]+/);
   if(parts.length<2)return null;
   const mi=MONTHS.map(m=>m.toLowerCase()).indexOf(parts[0]);
@@ -80,13 +91,16 @@ const parseBday=str=>{
   if(d<now)d.setFullYear(now.getFullYear()+1);
   return d;
 };
-const parseBdayParts=str=>{
-  if(!str)return['',''];
-  const parts=str.trim().toLowerCase().split(/[\s,]+/);
-  if(parts.length<2)return['',''];
-  const mi=MONTHS.map(m=>m.toLowerCase()).indexOf(parts[0]);
-  if(mi===-1)return['',''];
-  return[MONTHS[mi],parts[1]];
+const fmtBday=str=>{
+  if(!str)return'';
+  if(str.includes('-')&&str.length>=8){
+    const parts=str.split('-');
+    if(parts.length===3){
+      const d=new Date(parseInt(parts[0]),parseInt(parts[1])-1,parseInt(parts[2]));
+      return d.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+    }
+  }
+  return str;
 };
 const bdayIn14=str=>{const d=parseBday(str);if(!d)return false;const diff=(d-new Date())/86400000;return diff>=0&&diff<=14;};
 const bdayDays=str=>{const d=parseBday(str);if(!d)return null;return Math.max(0,Math.round((d-new Date())/86400000));};
@@ -223,28 +237,37 @@ const STORAGE_KEY='sc-v4';
 const load=()=>{try{const d=localStorage.getItem(STORAGE_KEY);return d?JSON.parse(d):null;}catch{return null;}};
 const save=d=>{try{localStorage.setItem(STORAGE_KEY,JSON.stringify(d));}catch{}};
 
-function BdayPicker({value,onChange}){
-  const [month,dayStr]=parseBdayParts(value);
-  const daysInMonth=month?new Date(2000,MONTHS.indexOf(month)+1,0).getDate():31;
-  const hMonth=m=>{
-    if(!m){onChange('');return;}
-    const d=dayStr||'1';
-    onChange(`${m} ${d}`);
+function AnniversarySection({anniversaries,onChange}){
+  const [open,setOpen]=useState((anniversaries||[]).length>0);
+  const add=()=>{
+    if((anniversaries||[]).length>=6)return;
+    onChange([...(anniversaries||[]),{date:'',note:''}]);
+    setOpen(true);
   };
-  const hDay=d=>{
-    if(!d||!month){return;}
-    onChange(`${month} ${d}`);
+  const upd=(i,k,v)=>{
+    const next=[...(anniversaries||[])];
+    next[i]={...next[i],[k]:v};
+    onChange(next);
   };
+  const del=i=>onChange((anniversaries||[]).filter((_,idx)=>idx!==i));
+  if(!open)return(
+    <div style={{marginBottom:18}}>
+      <button onClick={add} style={{background:'transparent',border:'none',color:'#9E9288',fontSize:11,cursor:'pointer',padding:0,textDecoration:'underline',opacity:0.6,display:'block'}}>+ Add anniversary</button>
+    </div>
+  );
   return(
-    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-      <select value={month||''} onChange={e=>hMonth(e.target.value)}>
-        <option value="">Month</option>
-        {MONTHS.map(m=><option key={m} value={m}>{m}</option>)}
-      </select>
-      <select value={dayStr||''} onChange={e=>hDay(e.target.value)} disabled={!month}>
-        <option value="">Day</option>
-        {Array.from({length:daysInMonth},(_,i)=><option key={i+1} value={String(i+1)}>{i+1}</option>)}
-      </select>
+    <div style={{marginBottom:18}}>
+      <span className="sl">Anniversaries</span>
+      {(anniversaries||[]).map((a,i)=>(
+        <div key={i} style={{display:'grid',gridTemplateColumns:'1fr 1fr auto',gap:8,marginBottom:8,alignItems:'center'}}>
+          <input type="date" value={a.date||''} onChange={e=>upd(i,'date',e.target.value)}/>
+          <input placeholder="Note (e.g. Closed on Maple St.)" value={a.note||''} onChange={e=>upd(i,'note',e.target.value)}/>
+          <button onClick={()=>del(i)} style={{background:'transparent',border:'none',cursor:'pointer',color:'#9E9288',fontSize:16,opacity:0.45,padding:'0 4px',flexShrink:0}} title="Remove">×</button>
+        </div>
+      ))}
+      {(anniversaries||[]).length<6&&(
+        <button onClick={add} style={{background:'transparent',border:'none',color:'#9E9288',fontSize:11,cursor:'pointer',padding:0,textDecoration:'underline',opacity:0.6,display:'block',marginTop:4}}>+ Add another</button>
+      )}
     </div>
   );
 }
@@ -370,7 +393,7 @@ function Dashboard({contacts,onOpen,onQL,logged,onLegend,onAdd,onUnsched}){
               <div key={c.id} className="card" onClick={()=>onOpen(c.id)} style={{display:'flex',justifyContent:'space-between',alignItems:'center',border:'1px solid #E5D2A8'}}>
                 <div>
                   <span style={{fontFamily:'Cormorant Garamond',fontSize:18,fontWeight:400}}>{c.fn} {c.ln}</span>
-                  {c.birthday&&<span style={{fontSize:12,color:'#A87C38',marginLeft:10}}>{c.birthday}</span>}
+                  {c.birthday&&<span style={{fontSize:12,color:'#A87C38',marginLeft:10}}>{fmtBday(c.birthday)}</span>}
                 </div>
                 <span style={{fontSize:11,color:'#A87C38',fontWeight:500}}>{bdayDays(c.birthday)===0?'Today 🎂':`in ${bdayDays(c.birthday)}d`}</span>
               </div>
@@ -581,14 +604,15 @@ function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
             ))}
           </div>
         </Fld>
-        <Fld label="Personal">
-          <div style={{marginBottom:10}}>
-            <span className="sl" style={{marginBottom:6}}>Birthday</span>
-            <BdayPicker value={f.birthday||''} onChange={v=>set('birthday',v)}/>
-          </div>
-          <span className="sl" style={{marginBottom:6}}>Conversation Starter</span>
+        <div style={{marginBottom:18}}>
+          <span className="sl">Conversation Starter</span>
           <input placeholder="A short note visible on the contact card…" value={f.starter||''} onChange={e=>set('starter',e.target.value)}/>
-        </Fld>
+        </div>
+        <div style={{marginBottom:18}}>
+          <span className="sl">Birthday</span>
+          <input type="date" value={f.birthday||''} onChange={e=>set('birthday',e.target.value)}/>
+        </div>
+        <AnniversarySection anniversaries={f.anniversaries||[]} onChange={v=>set('anniversaries',v)}/>
         <Fld label="Scheduling">
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
             <input type="date" value={f.nad||''} onChange={e=>set('nad',e.target.value)}/>
