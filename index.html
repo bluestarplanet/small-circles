@@ -397,7 +397,7 @@ function List({contacts,freqFilter,onOpen,onQL,logged,onAdd}){
   );
 }
 
-function Detail({contact,onSave,onDelete,onBack}){
+function Detail({contact,onSave,onDelete,onBack,onNext,hasNext}){
   const [f,setF]=useState({...contact});
   const [note,setNote]=useState('');
   const [saved,setSaved]=useState(false);
@@ -408,16 +408,16 @@ function Detail({contact,onSave,onDelete,onBack}){
   const addNote=()=>{if(!note.trim())return;set('log',[{text:note.trim(),date:todayStr()},...(f.log||[])]);setNote('');};
   return(
     <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-      <div style={{background:'#16293D',padding:'14px 18px',flexShrink:0,display:'grid',gridTemplateColumns:'40px 1fr 40px',alignItems:'center'}}>
+      <div style={{background:'#16293D',padding:'14px 18px',flexShrink:0,display:'flex',alignItems:'center',gap:14}}>
         <button onClick={onBack} style={{background:'rgba(201,168,112,0.15)',border:'1px solid rgba(201,168,112,0.35)',borderRadius:'50%',width:32,height:32,cursor:'pointer',color:'#C9A870',fontSize:20,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>‹</button>
-        <div style={{textAlign:'center',minWidth:0,padding:'0 8px'}}>
+        <div style={{flex:1,minWidth:0}}>
           <div style={{fontFamily:'Cormorant Garamond',fontSize:22,fontWeight:400,color:'#F6F1E9',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.fn} {f.ln}</div>
-          <div style={{display:'flex',gap:5,marginTop:4,flexWrap:'wrap',justifyContent:'center'}}>
+          <div style={{display:'flex',gap:5,marginTop:4,flexWrap:'wrap'}}>
             {f.freq&&<Bdg color={FREQ[f.freq]?.color} bg={FREQ[f.freq]?.bg}>{FREQ[f.freq]?.label}</Bdg>}
             {f.status&&<Bdg color="#9E9288" bg="rgba(255,255,255,0.08)">{STATUS[f.status]?.label}</Bdg>}
           </div>
         </div>
-        <div/>
+        <button onClick={onNext} disabled={!hasNext} style={{background:hasNext?'rgba(201,168,112,0.15)':'rgba(201,168,112,0.05)',border:'1px solid rgba(201,168,112,0.35)',borderRadius:'50%',width:32,height:32,cursor:hasNext?'pointer':'default',color:hasNext?'#C9A870':'rgba(201,168,112,0.25)',fontSize:20,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>›</button>
       </div>
       <div style={{flex:1,overflowY:'auto',padding:'18px 16px 40px'}}>
         <Fld label="Contact Info">
@@ -678,10 +678,19 @@ function App(){
           <List contacts={contacts} freqFilter={ff} onOpen={openContact} onQL={quickLog} logged={logged}
             onAdd={()=>{setPrev(screen);setScreen('add');}}/>
         )}
-        {screen==='detail'&&sel&&(
-          <Detail contact={sel} onSave={saveContact} onDelete={deleteContact}
-            onBack={()=>setScreen(prev==='detail'?'dashboard':prev)}/>
-        )}
+        {screen==='detail'&&sel&&(()=>{
+          const sorted=[...contacts].sort((a,b)=>{
+            if(a.nad&&b.nad)return a.nad.localeCompare(b.nad);
+            if(a.nad)return -1;if(b.nad)return 1;
+            return `${a.ln}${a.fn}`.localeCompare(`${b.ln}${b.fn}`);
+          });
+          const idx=sorted.findIndex(c=>c.id===sel.id);
+          const nextContact=sorted[idx+1];
+          return <Detail contact={sel} onSave={saveContact} onDelete={deleteContact}
+            onBack={()=>setScreen(prev==='detail'?'dashboard':prev)}
+            onNext={()=>nextContact&&setSid(nextContact.id)}
+            hasNext={!!nextContact}/>;
+        })()}
         {screen==='add'&&(
           <Add onSave={data=>{saveContact(data);setFf(null);setNav('all');setScreen('list');}}
             onBack={()=>setScreen(prev)}/>
