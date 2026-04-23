@@ -686,7 +686,7 @@ function App(){
           });
           const idx=sorted.findIndex(c=>c.id===sel.id);
           const nextContact=sorted[idx+1];
-          return <Detail contact={sel} onSave={saveContact} onDelete={deleteContact}
+          return <Detail key={sel.id} contact={sel} onSave={saveContact} onDelete={deleteContact}
             onBack={()=>setScreen(prev==='detail'?'dashboard':prev)}
             onNext={()=>nextContact&&setSid(nextContact.id)}
             hasNext={!!nextContact}/>;
