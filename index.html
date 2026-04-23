@@ -478,7 +478,7 @@ function NotesLog({log,onUpdate}){
     <div style={{marginBottom:18}}>
       <span className="sl">Notes Log</span>
       <div style={{display:'flex',gap:8,marginBottom:12}}>
-        <textarea placeholder="Add a timestamped entry — what happened on this call, what they said, what changed…" value={note} onChange={e=>setNote(e.target.value)} style={{flex:1,minHeight:60}}/>
+        <textarea placeholder="Result: what happened, what they said, what changed…" value={note} onChange={e=>setNote(e.target.value)} style={{flex:1,minHeight:60}}/>
         <button onClick={addNote} style={{background:'#16293D',color:'#F6F1E9',border:'none',borderRadius:8,width:40,cursor:'pointer',fontSize:20,display:'flex',alignItems:'center',justifyContent:'center',alignSelf:'flex-end',height:42,flexShrink:0}}>+</button>
       </div>
       {(log||[]).length===0&&<div style={{color:'#9E9288',fontSize:12,fontStyle:'italic',textAlign:'center',padding:'10px 0'}}>No entries yet</div>}
@@ -578,7 +578,7 @@ function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
           <select value={f.src||'SOI'} onChange={e=>set('src',e.target.value)} style={{marginBottom:10}}>
             {SOURCES.map(s=><option key={s} value={s}>{s}</option>)}
           </select>
-          <textarea placeholder="Background info — who they are, what you know, context that doesn't change much…" value={f.notes||''} onChange={e=>set('notes',e.target.value)}/>
+          <textarea placeholder="Background info: who they are, what you know, context that's unlikely to change…" value={f.notes||''} onChange={e=>set('notes',e.target.value)}/>
         </Fld>
         <Fld label="Frequency">
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
@@ -608,14 +608,7 @@ function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
         <Fld label="Scheduling">
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
             <input type="date" value={f.nad||''} onChange={e=>set('nad',e.target.value)}/>
-            <input placeholder="Next action" value={f.na||''} onChange={e=>set('na',e.target.value)}/>
-          </div>
-        </Fld>
-        <Fld label="Last Contact">
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
-            <input type="date" value={f.lc||''} onChange={e=>set('lc',e.target.value)}/>
-            <input placeholder="Method" value={f.meth||''} onChange={e=>set('meth',e.target.value)}/>
-            <input placeholder="Result" value={f.res||''} onChange={e=>set('res',e.target.value)}/>
+            <input placeholder="Method: call, drop by, send a note…" value={f.na||''} onChange={e=>set('na',e.target.value)}/>
           </div>
         </Fld>
         <NotesLog log={f.log||[]} onUpdate={v=>set('log',v)}/>
