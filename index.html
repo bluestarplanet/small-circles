@@ -408,15 +408,16 @@ function Detail({contact,onSave,onDelete,onBack}){
   const addNote=()=>{if(!note.trim())return;set('log',[{text:note.trim(),date:todayStr()},...(f.log||[])]);setNote('');};
   return(
     <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-      <div style={{background:'#16293D',padding:'14px 18px',flexShrink:0,display:'flex',alignItems:'center',gap:12}}>
-        <button onClick={onBack} style={{background:'transparent',border:'none',color:'#C9A870',fontSize:24,cursor:'pointer',lineHeight:1,padding:'0 4px',flexShrink:0}}>‹</button>
-        <div style={{flex:1,minWidth:0}}>
+      <div style={{background:'#16293D',padding:'14px 18px',flexShrink:0,display:'grid',gridTemplateColumns:'40px 1fr 40px',alignItems:'center'}}>
+        <button onClick={onBack} style={{background:'rgba(201,168,112,0.15)',border:'1px solid rgba(201,168,112,0.35)',borderRadius:'50%',width:32,height:32,cursor:'pointer',color:'#C9A870',fontSize:20,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>‹</button>
+        <div style={{textAlign:'center',minWidth:0,padding:'0 8px'}}>
           <div style={{fontFamily:'Cormorant Garamond',fontSize:22,fontWeight:400,color:'#F6F1E9',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.fn} {f.ln}</div>
-          <div style={{display:'flex',gap:5,marginTop:4,flexWrap:'wrap'}}>
+          <div style={{display:'flex',gap:5,marginTop:4,flexWrap:'wrap',justifyContent:'center'}}>
             {f.freq&&<Bdg color={FREQ[f.freq]?.color} bg={FREQ[f.freq]?.bg}>{FREQ[f.freq]?.label}</Bdg>}
             {f.status&&<Bdg color="#9E9288" bg="rgba(255,255,255,0.08)">{STATUS[f.status]?.label}</Bdg>}
           </div>
         </div>
+        <div/>
       </div>
       <div style={{flex:1,overflowY:'auto',padding:'18px 16px 40px'}}>
         <Fld label="Contact Info">
