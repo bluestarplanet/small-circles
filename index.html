@@ -580,7 +580,9 @@ function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
           </select>
           <textarea placeholder="Background info: who they are, what you know, context that's unlikely to change…" value={f.notes||''} onChange={e=>set('notes',e.target.value)}/>
         </Fld>
-        <hr style={{border:'none',borderTop:'1px solid #E2D8CC',margin:'4px 0 22px'}}/>
+        <div style={{display:'flex',justifyContent:'center',margin:'18px 0 28px'}}>
+          <div style={{width:'60%',borderTop:'1px solid #E2D8CC'}}/>
+        </div>
         <div style={{marginBottom:18}}>
           <span className="sl">Conversation Starter</span>
           <input placeholder="A short note visible on the contact card…" value={f.starter||''} onChange={e=>set('starter',e.target.value)}/>
