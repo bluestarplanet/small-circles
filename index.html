@@ -545,7 +545,7 @@ function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
         </div>
       </div>
       <div style={{flex:1,overflowY:'auto',padding:'18px 16px 40px'}}>
-        <Fld label="Contact Info">
+        <Fld label="Contact">
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
             <input placeholder="First name" value={f.fn||''} onChange={e=>set('fn',e.target.value)}/>
             <input placeholder="Last name" value={f.ln||''} onChange={e=>set('ln',e.target.value)}/>
@@ -584,8 +584,8 @@ function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
           <div style={{width:'60%',borderTop:'1px solid #E2D8CC'}}/>
         </div>
         <div style={{marginBottom:18}}>
-          <span className="sl">Conversation Starter</span>
-          <input placeholder="A short note visible on the contact card…" value={f.starter||''} onChange={e=>set('starter',e.target.value)}/>
+          <span className="sl">Conversation</span>
+          <input placeholder="Topic starter (appears on the contact card)" value={f.starter||''} onChange={e=>set('starter',e.target.value)}/>
         </div>
         <div style={{marginBottom:18}}>
           <span className="sl">Birthday</span>
@@ -595,22 +595,27 @@ function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
         <div style={{display:'flex',justifyContent:'center',margin:'18px 0 28px'}}>
           <div style={{width:'60%',borderTop:'1px solid #E2D8CC'}}/>
         </div>
-        <Fld label="Frequency">
-          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-            {Object.values(FREQ).map(fq=>(
-              <button key={fq.key} className="pill" onClick={()=>hFreq(fq.key)}
-                style={{color:f.freq===fq.key?fq.color:'#5E5248',background:f.freq===fq.key?fq.bg:'transparent',borderColor:f.freq===fq.key?fq.color:'#C5B59A'}}>{fq.label}</button>
-            ))}
+        <div style={{marginBottom:18}}>
+          <span className="sl">Connection</span>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+            <span style={{fontFamily:'Inter',fontSize:'9px',fontWeight:500,letterSpacing:'0.1em',textTransform:'uppercase',color:'#9E9288',minWidth:56,flexShrink:0}}>Frequency</span>
+            <div style={{display:'flex',gap:4}}>
+              {Object.values(FREQ).map(fq=>(
+                <button key={fq.key} className="pill" onClick={()=>hFreq(fq.key)}
+                  style={{color:f.freq===fq.key?fq.color:'#5E5248',background:f.freq===fq.key?fq.bg:'transparent',borderColor:f.freq===fq.key?fq.color:'#C5B59A',width:50,textAlign:'center',padding:'4px 0',fontSize:'10px'}}>{fq.label}</button>
+              ))}
+            </div>
           </div>
-        </Fld>
-        <Fld label="Status">
-          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-            {Object.values(STATUS).map(s=>(
-              <button key={s.key} className="pill" onClick={()=>set('status',s.key)}
-                style={{color:f.status===s.key?'#243C58':'#5E5248',background:f.status===s.key?'#C4D9EE':'transparent',borderColor:f.status===s.key?'#5C8FB5':'#C5B59A'}}>{s.label}</button>
-            ))}
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <span style={{fontFamily:'Inter',fontSize:'9px',fontWeight:500,letterSpacing:'0.1em',textTransform:'uppercase',color:'#9E9288',minWidth:56,flexShrink:0}}>Status</span>
+            <div style={{display:'flex',gap:4}}>
+              {Object.values(STATUS).map(s=>(
+                <button key={s.key} className="pill" onClick={()=>set('status',s.key)}
+                  style={{color:f.status===s.key?'#243C58':'#5E5248',background:f.status===s.key?'#C4D9EE':'transparent',borderColor:f.status===s.key?'#5C8FB5':'#C5B59A',width:50,textAlign:'center',padding:'4px 0',fontSize:'10px'}}>{s.label}</button>
+              ))}
+            </div>
           </div>
-        </Fld>
+        </div>
         <Fld label="Scheduling">
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
             <input type="date" value={f.nad||''} onChange={e=>set('nad',e.target.value)}/>
@@ -675,22 +680,27 @@ function Add({onSave,onBack}){
             {SOURCES.map(s=><option key={s} value={s}>{s}</option>)}
           </select>
         </Fld>
-        <Fld label="Frequency">
-          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-            {Object.values(FREQ).map(fq=>(
-              <button key={fq.key} className="pill" onClick={()=>hFreq(fq.key)}
-                style={{color:f.freq===fq.key?fq.color:'#5E5248',background:f.freq===fq.key?fq.bg:'transparent',borderColor:f.freq===fq.key?fq.color:'#C5B59A'}}>{fq.label}</button>
-            ))}
+        <div style={{marginBottom:18}}>
+          <span className="sl">Connection</span>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+            <span style={{fontFamily:'Inter',fontSize:'9px',fontWeight:500,letterSpacing:'0.1em',textTransform:'uppercase',color:'#9E9288',minWidth:56,flexShrink:0}}>Frequency</span>
+            <div style={{display:'flex',gap:4}}>
+              {Object.values(FREQ).map(fq=>(
+                <button key={fq.key} className="pill" onClick={()=>hFreq(fq.key)}
+                  style={{color:f.freq===fq.key?fq.color:'#5E5248',background:f.freq===fq.key?fq.bg:'transparent',borderColor:f.freq===fq.key?fq.color:'#C5B59A',width:50,textAlign:'center',padding:'4px 0',fontSize:'10px'}}>{fq.label}</button>
+              ))}
+            </div>
           </div>
-        </Fld>
-        <Fld label="Status">
-          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-            {Object.values(STATUS).map(s=>(
-              <button key={s.key} className="pill" onClick={()=>set('status',s.key)}
-                style={{color:f.status===s.key?'#243C58':'#5E5248',background:f.status===s.key?'#C4D9EE':'transparent',borderColor:f.status===s.key?'#5C8FB5':'#C5B59A'}}>{s.label}</button>
-            ))}
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <span style={{fontFamily:'Inter',fontSize:'9px',fontWeight:500,letterSpacing:'0.1em',textTransform:'uppercase',color:'#9E9288',minWidth:56,flexShrink:0}}>Status</span>
+            <div style={{display:'flex',gap:4}}>
+              {Object.values(STATUS).map(s=>(
+                <button key={s.key} className="pill" onClick={()=>set('status',s.key)}
+                  style={{color:f.status===s.key?'#243C58':'#5E5248',background:f.status===s.key?'#C4D9EE':'transparent',borderColor:f.status===s.key?'#5C8FB5':'#C5B59A',width:50,textAlign:'center',padding:'4px 0',fontSize:'10px'}}>{s.label}</button>
+              ))}
+            </div>
           </div>
-        </Fld>
+        </div>
         <Fld label="Personal">
           <div style={{marginBottom:10}}>
             <span className="sl" style={{marginBottom:6}}>Birthday</span>
