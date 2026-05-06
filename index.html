@@ -36,8 +36,6 @@ textarea{resize:vertical;min-height:72px;}
 .si{border-radius:24px;padding:9px 16px;font-size:13px;font-family:'Inter',sans-serif;outline:none;width:100%;}
 .icon-btn{background:transparent;border:none;cursor:pointer;padding:4px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;opacity:0.45;transition:opacity 0.15s;}
 .icon-btn:hover{opacity:0.85;}
-.pulsar-btn{background:transparent;border:none;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;transition:opacity 0.2s;}
-.pulsar-btn:hover{opacity:0.75;}
 </style>
 </head>
 <body>
@@ -45,7 +43,6 @@ textarea{resize:vertical;min-height:72px;}
 <script type="text/babel">
 const {useState,useEffect,useRef,createContext,useContext}=React;
 
-// ── Theme ─────────────────────────────────────────────────────────────────────
 const mkTh=dk=>({
   bg:    dk?'#1C1814':'#F6F1E9',
   card:  dk?'#28211A':'#FDFAF4',
@@ -76,25 +73,32 @@ input:focus,textarea:focus,select:focus{border-color:${dk?'#7A6A58':'#C5B59A'};}
 const ThCtx=createContext({});
 const useTh=()=>useContext(ThCtx);
 
-// ── Constants ─────────────────────────────────────────────────────────────────
 const FREQ={
-  pulse:  {key:'pulse',  label:'Pulse',  desc:'Weekly',            color:'#B0607A',bg:'#EECDD6',days:7},
-  flow:   {key:'flow',   label:'Flow',   desc:'Monthly',           color:'#5C8FB5',bg:'#C4D9EE',days:30},
-  phase:  {key:'phase',  label:'Phase',  desc:'Quarterly',         color:'#A87C38',bg:'#E5D2A8',days:90},
-  revolve:{key:'revolve',label:'Revolve',desc:'Annually',          color:'#4E7C5A',bg:'#C0D4C4',days:365},
-  rest:   {key:'rest',   label:'Rest',   desc:'When it feels right',color:'#6E6158',bg:'#D5CEC5',days:null},
+  weekly:   {key:'weekly',   label:'Weekly',    days:7},
+  monthly:  {key:'monthly',  label:'Monthly',   days:30},
+  quarterly:{key:'quarterly',label:'Quarterly', days:90},
+  annually: {key:'annually', label:'Annually',  days:365},
+  bespoke:  {key:'bespoke',  label:'Bespoke',   days:null},
 };
 const STATUS={
-  static:{key:'static',label:'Static',desc:'New, not yet in motion'},
-  signal:{key:'signal',label:'Signal',desc:'Nurturing, relationship building'},
-  lock:  {key:'lock',  label:'Lock',  desc:'Active — something real in motion'},
-  echo:  {key:'echo',  label:'Echo',  desc:'Past client'},
-  relay: {key:'relay', label:'Relay', desc:'Referral source'},
+  new:       {key:'new',       label:'New',       desc:'A new connection'},
+  nurturing: {key:'nurturing', label:'Nurturing', desc:'Building a relationship'},
+  active:    {key:'active',    label:'Active',    desc:'In motion — priority contact'},
+  legacy:    {key:'legacy',    label:'Legacy',    desc:'A valued past client'},
 };
+
+// freq color map
+const FCOLOR={
+  weekly:   {color:'#B0607A',bg:'#EECDD6'},
+  monthly:  {color:'#5C8FB5',bg:'#C4D9EE'},
+  quarterly:{color:'#A87C38',bg:'#E5D2A8'},
+  annually: {color:'#4E7C5A',bg:'#C0D4C4'},
+  bespoke:  {color:'#6E6158',bg:'#D5CEC5'},
+};
+
 const SOURCES=['SOI','Open House','Referral','Social Media','Networking Event','Door Knocking','Farm','Other'];
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-// ── Utils ─────────────────────────────────────────────────────────────────────
 const todayStr=()=>new Date().toISOString().split('T')[0];
 const addDays=(str,n)=>{const d=new Date((str||todayStr())+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().split('T')[0];};
 const daysUntil=str=>str?Math.round((new Date(str+'T00:00:00')-new Date(todayStr()+'T00:00:00'))/86400000):null;
@@ -121,12 +125,21 @@ const fmtBday=str=>{
 const bdayIn14=str=>{const d=parseBday(str);if(!d)return false;const diff=(d-new Date())/86400000;return diff>=0&&diff<=14;};
 const bdayDays=str=>{const d=parseBday(str);if(!d)return null;return Math.max(0,Math.round((d-new Date())/86400000));};
 
-// ── Defaults ──────────────────────────────────────────────────────────────────
+// migrate old freq/status keys
+const migrateContact=c=>({
+  addr1:'',city:'',state:'',zip:'',anniversaries:[],...c,
+  freq:({pulse:'weekly',flow:'monthly',phase:'quarterly',revolve:'annually',rest:'bespoke'}[c.freq]||c.freq||'monthly'),
+  status:({static:'new',signal:'nurturing',lock:'active',echo:'legacy',relay:'nurturing'}[c.status]||c.status||'new'),
+});
+
 const mk=(fn,ln,ph,em,src,lc,meth,res,na,bn,notes,met,starter)=>({
   id:uid(),fn,ln,ph:ph||'',em:em||'',src,met:met||'',lc:lc||'',meth:meth||'',res:res||'',na:na||'',nad:'',
-  bn:bn||'',notes:notes||'',freq:src==='Open House'?'phase':'flow',status:bn?'signal':'static',
+  bn:bn||'',notes:notes||'',
+  freq:src==='Open House'?'quarterly':'monthly',
+  status:'new',
   birthday:'',starter:starter||'',log:[],addr1:'',city:'',state:'',zip:'',anniversaries:[],
 });
+
 const DEFAULTS=[
   mk('Alexis','Nelson','(310) 422-4558','alexismnelson@gmail.com','SOI','2026-01-07','Text','','Follow up','','','2026-01-07'),
   mk('Ali','Bayless','(704) 576-3296','laurenalibayless@gmail.com','SOI','2025-06-05','Call','LM','Call'),
@@ -222,12 +235,12 @@ const DEFAULTS=[
   mk('Valerie','Steighner','(818) 983-9799','vsteighner@gmail.com','SOI','','','','Email'),
   mk('Victoire','Charles','(646) 221-4049','','SOI','','','','Call'),
   mk('Yorlin','Madera','(323) 839-3735','','SOI','','','','Call'),
-  mk('Chris','Clay','(484) 695-5870','csclay5112@gmail.com','Open House','','','','Call','','Young couple, eloping. Father is Lloyd.','','Young couple eloping — Dad is Lloyd, asked for your card'),
+  mk('Chris','Clay','(484) 695-5870','csclay5112@gmail.com','Open House','','','','Call','','Young couple, eloping. Father is Lloyd.','','Young couple eloping — Dad is Lloyd'),
   mk('Jef','Cohen','','jeff@gethighfly.com','Open House','','','','Email','','Oregon, wants to be closer to kids. Microsoft 35 years.','','Oregon to LA — near kids, 35 yrs at Microsoft'),
   mk('Joni','Allen','(323) 692-1491','jonisweetie@gmail.com','Open House','','','','Call','','Friend of Roy Stone. Boyfriend of John Waite. May remodel.','','May remodel instead of buy — keep nurturing'),
-  mk('Jeffery','Zaeder','','jzaeder@gmail.com','Open House','','','','Email','','Jeff and Isabella. German Shepherd. Isabella writes mysteries.','','Isabella writes mysteries — ask how the search is going'),
+  mk('Jeffery','Zaeder','','jzaeder@gmail.com','Open House','','','','Email','','Jeff and Isabella. German Shepherd. Isabella writes mysteries.','','Isabella writes mysteries — ask how search is going'),
   mk('Jeff & Katie','Dunn','(203) 982-1162','katielepi@gmail.com','Open House','','','','Call','5000000','Jeff, Safety VP at Hinge. Katie, massage therapist. Up to $5M.','','Safety VP at Hinge — budget up to $5M'),
-  mk('Kevin','Chen','(559) 360-8586','kevinchen2991@gmail.com','Open House','','','','Call','','Investor in consumer companies. From Fresno.','','Consumer company investor — check in'),
+  mk('Kevin','Chen','(559) 360-8586','kevinchen2991@gmail.com','Open House','','','','Call','','Investor in consumer companies. From Fresno.','','Consumer company investor'),
   mk('Krysta & William','Buck','(714) 337-2007','klfauria@gmail.com','Open House','','','','Call','','AP reporter. Back looking after a year break.','','AP reporter — back after a year break'),
   mk('Mahmood','Jeewa','','mahmoodjeewa123@gmail.com','Open House','','','','Email','','In talks with a few agents.','','In talks with others — move quickly'),
   mk('Henry','Maroney','','maroneyhenry@gmail.com','Open House','','','','Email','','Surname is English, not Irish.','','Note: surname is English, not Irish'),
@@ -245,12 +258,10 @@ const DEFAULTS=[
   mk('Kerry','Newman','(310) 804-9428','kerrylindsaynewman@yahoo.com','Open House','','','','Call'),
 ];
 
-// ── Storage ───────────────────────────────────────────────────────────────────
 const SK='sc-v4';
 const load=()=>{try{const d=localStorage.getItem(SK);return d?JSON.parse(d):null;}catch{return null;}};
 const save=d=>{try{localStorage.setItem(SK,JSON.stringify(d));}catch{}};
 
-// ── Shared UI ─────────────────────────────────────────────────────────────────
 function Pulsar({size=80,color='#C9A870',animate=false,onClick}){
   const cx=80,cy=80,outer=52,circles=[22,36,52],lens=[22,16,11];
   return(
@@ -289,16 +300,15 @@ const Accent=({color,label})=>(
     <span className="sl" style={{marginBottom:0}}>{label}</span>
   </div>
 );
-const Fld=({label,children})=>{const th=useTh();return <div style={{marginBottom:18}}><span className="sl">{label}</span>{children}</div>;};
-
-function Divider(){
+const Fld=({label,children})=><div style={{marginBottom:18}}><span className="sl">{label}</span>{children}</div>;
+const Divider=()=>{
   const th=useTh();
   return(
     <div style={{display:'flex',justifyContent:'center',margin:'18px 0 28px'}}>
       <div style={{width:'60%',borderTop:`1px solid ${th.bdr}`}}/>
     </div>
   );
-}
+};
 
 function ConnectionSection({freq,status,onFreq,onStatus}){
   const th=useTh();
@@ -308,10 +318,13 @@ function ConnectionSection({freq,status,onFreq,onStatus}){
       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
         <span style={{fontFamily:'Inter',fontSize:9,fontWeight:500,letterSpacing:'0.1em',textTransform:'uppercase',color:th.tLt,minWidth:56,flexShrink:0}}>Frequency</span>
         <div style={{display:'flex',gap:4}}>
-          {Object.values(FREQ).map(fq=>(
-            <button key={fq.key} className="pill" onClick={()=>onFreq(fq.key)}
-              style={{color:freq===fq.key?fq.color:th.tMed,background:freq===fq.key?fq.bg:'transparent',borderColor:freq===fq.key?fq.color:th.pillBdr,width:50,textAlign:'center',padding:'4px 0',fontSize:10}}>{fq.label}</button>
-          ))}
+          {Object.values(FREQ).map(fq=>{
+            const fc=FCOLOR[fq.key];
+            return(
+              <button key={fq.key} className="pill" onClick={()=>onFreq(fq.key)}
+                style={{color:freq===fq.key?fc.color:th.tMed,background:freq===fq.key?fc.bg:'transparent',borderColor:freq===fq.key?fc.color:th.pillBdr,width:60,textAlign:'center',padding:'4px 0',fontSize:10}}>{fq.label}</button>
+            );
+          })}
         </div>
       </div>
       <div style={{display:'flex',alignItems:'center',gap:8}}>
@@ -319,7 +332,7 @@ function ConnectionSection({freq,status,onFreq,onStatus}){
         <div style={{display:'flex',gap:4}}>
           {Object.values(STATUS).map(s=>(
             <button key={s.key} className="pill" onClick={()=>onStatus(s.key)}
-              style={{color:status===s.key?'#243C58':th.tMed,background:status===s.key?'#C4D9EE':'transparent',borderColor:status===s.key?'#5C8FB5':th.pillBdr,width:50,textAlign:'center',padding:'4px 0',fontSize:10}}>{s.label}</button>
+              style={{color:status===s.key?'#243C58':th.tMed,background:status===s.key?'#C4D9EE':'transparent',borderColor:status===s.key?'#5C8FB5':th.pillBdr,width:60,textAlign:'center',padding:'4px 0',fontSize:10}}>{s.label}</button>
           ))}
         </div>
       </div>
@@ -402,10 +415,39 @@ function NotesLog({log,onUpdate}){
   );
 }
 
-// ── Contact Card ──────────────────────────────────────────────────────────────
+function TopNav({active,onNav}){
+  const th=useTh();
+  const items=[
+    {key:'home',label:'Home'},
+    {key:'all',label:'All'},
+    {key:'weekly',label:'Weekly'},
+    {key:'monthly',label:'Monthly'},
+    {key:'quarterly',label:'Quarterly'},
+    {key:'annually',label:'Annually'},
+    {key:'bespoke',label:'Bespoke'},
+  ];
+  return(
+    <div style={{background:th.lHead,borderBottom:`1px solid ${th.bdr}`,display:'flex',overflowX:'auto',flexShrink:0}}>
+      {items.map(item=>{
+        const isAct=active===item.key;
+        const fc=FCOLOR[item.key];
+        const dotColor=fc?fc.color:'#C9A870';
+        return(
+          <button key={item.key} onClick={()=>onNav(item.key)}
+            style={{flex:'0 0 auto',background:'transparent',border:'none',padding:'10px 12px 8px',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:4,borderBottom:isAct?`2px solid ${dotColor}`:'2px solid transparent',transition:'all 0.15s'}}>
+            <span style={{fontFamily:'Inter',fontSize:9,fontWeight:isAct?500:400,letterSpacing:'0.1em',color:isAct?dotColor:th.tLt,textTransform:'uppercase',whiteSpace:'nowrap',transition:'color 0.15s'}}>{item.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function CCard({c,onOpen,onQL,logged}){
   const th=useTh();
-  const fq=FREQ[c.freq],st=STATUS[c.status],dd=c.nad?daysUntil(c.nad):null;
+  const fc=FCOLOR[c.freq]||FCOLOR.monthly;
+  const st=STATUS[c.status];
+  const dd=c.nad?daysUntil(c.nad):null;
   let nc=th.tLt,nl='';
   if(c.nad){
     if(dd<0){nc='#B03030';nl=`${Math.abs(dd)}d overdue`;}
@@ -418,7 +460,7 @@ function CCard({c,onOpen,onQL,logged}){
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8,marginBottom:4}}>
         <span style={{fontFamily:'Cormorant Garamond',fontSize:20,fontWeight:400,color:th.text,lineHeight:1.2}}>{c.fn} {c.ln}</span>
         <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'flex-end',flexShrink:0}}>
-          {fq&&<Bdg color={fq.color} bg={fq.bg}>{fq.label}</Bdg>}
+          {fc&&<Bdg color={fc.color} bg={fc.bg}>{FREQ[c.freq]?.label||c.freq}</Bdg>}
           {st&&<Bdg color={th.tMed} bg={th.noteBg}>{st.label}</Bdg>}
         </div>
       </div>
@@ -437,8 +479,7 @@ function CCard({c,onOpen,onQL,logged}){
   );
 }
 
-// ── Dashboard ─────────────────────────────────────────────────────────────────
-function Dashboard({contacts,onOpen,onQL,logged,onInfo,onAdd,onUnsched,showReminder,lastExport,onExport,onDismiss,dark,onToggleDark}){
+function Dashboard({contacts,onOpen,onQL,logged,onInfo,onAdd,onUnsched,showReminder,lastExport,onExport,onDismiss,onToggleDark}){
   const th=useTh();
   const t=todayStr();
   const overdue=contacts.filter(c=>c.nad&&c.nad<t).sort((a,b)=>a.nad.localeCompare(b.nad));
@@ -451,7 +492,7 @@ function Dashboard({contacts,onOpen,onQL,logged,onInfo,onAdd,onUnsched,showRemin
   const daysSince=lastExport?Math.abs(daysUntil(lastExport)):null;
   return(
     <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-      <div style={{background:th.hdr,padding:'18px 20px',flexShrink:0}}>
+      <div style={{background:th.hdr,padding:'18px 20px 14px',flexShrink:0}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
           <div>
             <div style={{fontFamily:'Inter',fontSize:8.5,fontWeight:500,letterSpacing:'0.22em',color:'#C9A870',textTransform:'uppercase',marginBottom:5}}>Small Circles</div>
@@ -459,7 +500,6 @@ function Dashboard({contacts,onOpen,onQL,logged,onInfo,onAdd,onUnsched,showRemin
           </div>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
             <button onClick={onAdd} style={{background:'rgba(201,168,112,0.15)',border:'1px solid rgba(201,168,112,0.3)',borderRadius:'50%',width:30,height:30,cursor:'pointer',color:'#C9A870',fontSize:20,display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
-            <button onClick={onInfo} style={{background:'transparent',border:'1px solid rgba(201,168,112,0.3)',borderRadius:'50%',width:28,height:28,cursor:'pointer',color:'#C9A870',fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',fontStyle:'italic',fontFamily:'serif',fontWeight:'bold'}}>i</button>
             <Pulsar size={46} color="#C9A870" onClick={onToggleDark}/>
           </div>
         </div>
@@ -473,7 +513,7 @@ function Dashboard({contacts,onOpen,onQL,logged,onInfo,onAdd,onUnsched,showRemin
         </div>
       </div>
       {showReminder&&(
-        <div style={{background:'rgba(168,124,56,0.12)',borderBottom:`1px solid rgba(168,124,56,0.25)`,padding:'10px 16px',display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
+        <div style={{background:'rgba(168,124,56,0.12)',borderBottom:'1px solid rgba(168,124,56,0.25)',padding:'10px 16px',display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
           <span style={{fontSize:12,color:'#A87C38',flex:1,fontFamily:'Inter'}}>
             {lastExport?`Last backup: ${daysSince} day${daysSince!==1?'s':''} ago.`:'Your contacts have never been backed up.'} Export now?
           </span>
@@ -481,7 +521,7 @@ function Dashboard({contacts,onOpen,onQL,logged,onInfo,onAdd,onUnsched,showRemin
           <button onClick={onDismiss} style={{background:'transparent',border:'none',color:'#A87C38',fontSize:16,cursor:'pointer',opacity:0.6,padding:'0 2px',lineHeight:1}}>×</button>
         </div>
       )}
-      <div style={{flex:1,overflowY:'auto',padding:'18px 14px 110px',background:th.bg}}>
+      <div style={{flex:1,overflowY:'auto',padding:'18px 14px 80px',background:th.bg}}>
         {empty&&bdays.length===0&&(
           <div style={{textAlign:'center',paddingTop:70}}>
             <Pulsar size={70} color="#C5B59A"/>
@@ -495,7 +535,7 @@ function Dashboard({contacts,onOpen,onQL,logged,onInfo,onAdd,onUnsched,showRemin
           <div style={{marginBottom:22}}>
             <Accent color="#A87C38" label="Upcoming Birthdays"/>
             {bdays.map(c=>(
-              <div key={c.id} className="card" onClick={()=>onOpen(c.id)} style={{display:'flex',justifyContent:'space-between',alignItems:'center',borderColor:'#E5D2A8'}}>
+              <div key={c.id} className="card" onClick={()=>onOpen(c.id)} style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                 <div>
                   <span style={{fontFamily:'Cormorant Garamond',fontSize:18,fontWeight:400,color:th.text}}>{c.fn} {c.ln}</span>
                   {c.birthday&&<span style={{fontSize:12,color:'#A87C38',marginLeft:10}}>{fmtBday(c.birthday)}</span>}
@@ -514,17 +554,23 @@ function Dashboard({contacts,onOpen,onQL,logged,onInfo,onAdd,onUnsched,showRemin
           </div>
         )}
       </div>
+      <div style={{padding:'10px 20px',background:th.lHead,borderTop:`1px solid ${th.bdr}`,display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
+        <button onClick={onInfo} style={{background:'transparent',border:`1px solid ${th.pillBdr}`,borderRadius:'50%',width:28,height:28,cursor:'pointer',color:th.tLt,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',fontStyle:'italic',fontFamily:'serif',fontWeight:'bold'}}>i</button>
+        <div style={{fontFamily:'Inter',fontSize:9,color:th.tLt,letterSpacing:'0.1em',textTransform:'uppercase',opacity:0.5}}>
+          {lastExport?`Backed up ${Math.abs(daysUntil(lastExport))}d ago`:'Not yet backed up'}
+        </div>
+      </div>
     </div>
   );
 }
 
-// ── List ──────────────────────────────────────────────────────────────────────
 function List({contacts,freqFilter,onOpen,onQL,logged,onAdd}){
   const th=useTh();
   const [search,setSearch]=useState('');
   const [sf,setSf]=useState(null);
   const title=freqFilter==='unscheduled'?'Unscheduled':freqFilter?FREQ[freqFilter]?.label:'All Contacts';
-  const tc=freqFilter&&FREQ[freqFilter]?FREQ[freqFilter].color:th.text;
+  const fc=freqFilter?FCOLOR[freqFilter]:null;
+  const tc=fc?fc.color:th.text;
   const list=contacts
     .filter(c=>freqFilter==='unscheduled'?!c.nad:freqFilter?c.freq===freqFilter:true)
     .filter(c=>sf?c.status===sf:true)
@@ -557,7 +603,7 @@ function List({contacts,freqFilter,onOpen,onQL,logged,onAdd}){
           ))}
         </div>
       </div>
-      <div style={{flex:1,overflowY:'auto',padding:'12px 14px 110px',background:th.bg}}>
+      <div style={{flex:1,overflowY:'auto',padding:'12px 14px 80px',background:th.bg}}>
         {list.length===0&&<div style={{textAlign:'center',paddingTop:60,fontFamily:'Cormorant Garamond',fontSize:20,fontStyle:'italic',color:th.tLt}}>No contacts found</div>}
         {list.map(c=><CCard key={c.id} c={c} onOpen={onOpen} onQL={onQL} logged={!!logged[c.id]}/>)}
       </div>
@@ -565,7 +611,68 @@ function List({contacts,freqFilter,onOpen,onQL,logged,onAdd}){
   );
 }
 
-// ── Detail ────────────────────────────────────────────────────────────────────
+function ContactForm({f,set,addrOpen,setAddrOpen,isNew}){
+  const th=useTh();
+  const hFreq=k=>{const days=FREQ[k]?.days;set('freq',k);if(days)set('nad',addDays(todayStr(),days));};
+  return(
+    <>
+      <Fld label="Contact">
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
+          <input placeholder="First name" value={f.fn||''} onChange={e=>set('fn',e.target.value)}/>
+          <input placeholder="Last name" value={f.ln||''} onChange={e=>set('ln',e.target.value)}/>
+        </div>
+        <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:10}}>
+          <input placeholder="Phone" value={f.ph||''} onChange={e=>set('ph',e.target.value)} style={{flex:1}}/>
+          {!isNew&&f.ph&&<a href={`tel:${f.ph}`} style={{color:'#5C8FB5',fontSize:18,textDecoration:'none',flexShrink:0}}>📞</a>}
+        </div>
+        <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:10}}>
+          <input placeholder="Email" value={f.em||''} onChange={e=>set('em',e.target.value)} style={{flex:1}}/>
+          {!isNew&&f.em&&<a href={`mailto:${f.em}`} style={{color:'#5C8FB5',fontSize:18,textDecoration:'none',flexShrink:0}}>✉</a>}
+        </div>
+        {addrOpen?(
+          <div style={{marginBottom:10}}>
+            <input placeholder="Street address" value={f.addr1||''} onChange={e=>set('addr1',e.target.value)} style={{marginBottom:8}}/>
+            <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr',gap:8}}>
+              <input placeholder="City" value={f.city||''} onChange={e=>set('city',e.target.value)}/>
+              <input placeholder="State" value={f.state||''} onChange={e=>set('state',e.target.value)}/>
+              <input placeholder="ZIP" value={f.zip||''} onChange={e=>set('zip',e.target.value)}/>
+            </div>
+            <button onClick={()=>setAddrOpen(false)} style={{background:'transparent',border:'none',color:th.tLt,fontSize:11,cursor:'pointer',marginTop:6,padding:0,textDecoration:'underline',opacity:0.6}}>Hide address</button>
+          </div>
+        ):(
+          <button onClick={()=>setAddrOpen(true)} style={{background:'transparent',border:'none',color:th.tLt,fontSize:11,cursor:'pointer',padding:0,textDecoration:'underline',opacity:0.6,marginBottom:10,display:'block'}}>+ Add address</button>
+        )}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
+          <input placeholder="First met" value={f.met||''} onChange={e=>set('met',e.target.value)}/>
+          <input placeholder="Budget" value={f.bn||''} onChange={e=>set('bn',e.target.value)}/>
+        </div>
+        <select value={f.src||'SOI'} onChange={e=>set('src',e.target.value)} style={{marginBottom:10}}>
+          {SOURCES.map(s=><option key={s} value={s}>{s}</option>)}
+        </select>
+        <textarea placeholder="Background info: who they are, what you know, context that's unlikely to change…" value={f.notes||''} onChange={e=>set('notes',e.target.value)}/>
+      </Fld>
+      <Divider/>
+      <div style={{marginBottom:18}}>
+        <span className="sl">Conversation</span>
+        <input placeholder="Topic starter (appears on the contact card)" value={f.starter||''} onChange={e=>set('starter',e.target.value)}/>
+      </div>
+      <div style={{marginBottom:18}}>
+        <span className="sl">Birthday</span>
+        <input type="date" value={f.birthday||''} onChange={e=>set('birthday',e.target.value)}/>
+      </div>
+      <AnniversarySection anniversaries={f.anniversaries||[]} onChange={v=>set('anniversaries',v)}/>
+      <Divider/>
+      <ConnectionSection freq={f.freq} status={f.status} onFreq={hFreq} onStatus={k=>set('status',k)}/>
+      <Fld label="Scheduling">
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+          <input type="date" value={f.nad||''} onChange={e=>set('nad',e.target.value)}/>
+          <input placeholder="Method: call, drop by, send a note…" value={f.na||''} onChange={e=>set('na',e.target.value)}/>
+        </div>
+      </Fld>
+    </>
+  );
+}
+
 function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
   const th=useTh();
   const [f,setF]=useState({addr1:'',city:'',state:'',zip:'',anniversaries:[],...contact});
@@ -573,7 +680,6 @@ function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
   const [cdel,setCdel]=useState(false);
   const [addrOpen,setAddrOpen]=useState(!!(contact.addr1||contact.city));
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
-  const hFreq=k=>{const days=FREQ[k]?.days;set('freq',k);if(days)set('nad',addDays(todayStr(),days));};
   const hSave=()=>{onSave(f);setSaved(true);setTimeout(()=>setSaved(false),2000);};
   return(
     <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
@@ -582,8 +688,8 @@ function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontFamily:'Cormorant Garamond',fontSize:22,fontWeight:400,color:'#F6F1E9',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.fn} {f.ln}</div>
           <div style={{display:'flex',gap:5,marginTop:4,flexWrap:'wrap'}}>
-            {f.freq&&<Bdg color={FREQ[f.freq]?.color} bg={FREQ[f.freq]?.bg}>{FREQ[f.freq]?.label}</Bdg>}
-            {f.status&&<Bdg color="#9E9288" bg="rgba(255,255,255,0.08)">{STATUS[f.status]?.label}</Bdg>}
+            {f.freq&&<Bdg color={FCOLOR[f.freq]?.color||'#9E9288'} bg={FCOLOR[f.freq]?.bg||'#EEE'}>{FREQ[f.freq]?.label||f.freq}</Bdg>}
+            {f.status&&<Bdg color="#9E9288" bg="rgba(255,255,255,0.08)">{STATUS[f.status]?.label||f.status}</Bdg>}
           </div>
         </div>
         <div style={{display:'flex',gap:6,flexShrink:0}}>
@@ -592,59 +698,7 @@ function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
         </div>
       </div>
       <div style={{flex:1,overflowY:'auto',padding:'18px 16px 40px',background:th.bg}}>
-        <Fld label="Contact">
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
-            <input placeholder="First name" value={f.fn||''} onChange={e=>set('fn',e.target.value)}/>
-            <input placeholder="Last name" value={f.ln||''} onChange={e=>set('ln',e.target.value)}/>
-          </div>
-          <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:10}}>
-            <input placeholder="Phone" value={f.ph||''} onChange={e=>set('ph',e.target.value)} style={{flex:1}}/>
-            {f.ph&&<a href={`tel:${f.ph}`} style={{color:'#5C8FB5',fontSize:18,textDecoration:'none',flexShrink:0}}>📞</a>}
-          </div>
-          <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:10}}>
-            <input placeholder="Email" value={f.em||''} onChange={e=>set('em',e.target.value)} style={{flex:1}}/>
-            {f.em&&<a href={`mailto:${f.em}`} style={{color:'#5C8FB5',fontSize:18,textDecoration:'none',flexShrink:0}}>✉</a>}
-          </div>
-          {addrOpen?(
-            <div style={{marginBottom:10}}>
-              <input placeholder="Street address" value={f.addr1||''} onChange={e=>set('addr1',e.target.value)} style={{marginBottom:8}}/>
-              <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr',gap:8}}>
-                <input placeholder="City" value={f.city||''} onChange={e=>set('city',e.target.value)}/>
-                <input placeholder="State" value={f.state||''} onChange={e=>set('state',e.target.value)}/>
-                <input placeholder="ZIP" value={f.zip||''} onChange={e=>set('zip',e.target.value)}/>
-              </div>
-              <button onClick={()=>setAddrOpen(false)} style={{background:'transparent',border:'none',color:th.tLt,fontSize:11,cursor:'pointer',marginTop:6,padding:0,textDecoration:'underline',opacity:0.6}}>Hide address</button>
-            </div>
-          ):(
-            <button onClick={()=>setAddrOpen(true)} style={{background:'transparent',border:'none',color:th.tLt,fontSize:11,cursor:'pointer',padding:0,textDecoration:'underline',opacity:0.6,marginBottom:10,display:'block'}}>+ Add address</button>
-          )}
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
-            <input placeholder="First met" value={f.met||''} onChange={e=>set('met',e.target.value)}/>
-            <input placeholder="Budget" value={f.bn||''} onChange={e=>set('bn',e.target.value)}/>
-          </div>
-          <select value={f.src||'SOI'} onChange={e=>set('src',e.target.value)} style={{marginBottom:10}}>
-            {SOURCES.map(s=><option key={s} value={s}>{s}</option>)}
-          </select>
-          <textarea placeholder="Background info: who they are, what you know, context that's unlikely to change…" value={f.notes||''} onChange={e=>set('notes',e.target.value)}/>
-        </Fld>
-        <Divider/>
-        <div style={{marginBottom:18}}>
-          <span className="sl">Conversation</span>
-          <input placeholder="Topic starter (appears on the contact card)" value={f.starter||''} onChange={e=>set('starter',e.target.value)}/>
-        </div>
-        <div style={{marginBottom:18}}>
-          <span className="sl">Birthday</span>
-          <input type="date" value={f.birthday||''} onChange={e=>set('birthday',e.target.value)}/>
-        </div>
-        <AnniversarySection anniversaries={f.anniversaries||[]} onChange={v=>set('anniversaries',v)}/>
-        <Divider/>
-        <ConnectionSection freq={f.freq} status={f.status} onFreq={hFreq} onStatus={k=>set('status',k)}/>
-        <Fld label="Scheduling">
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-            <input type="date" value={f.nad||''} onChange={e=>set('nad',e.target.value)}/>
-            <input placeholder="Method: call, drop by, send a note…" value={f.na||''} onChange={e=>set('na',e.target.value)}/>
-          </div>
-        </Fld>
+        <ContactForm f={f} set={set} addrOpen={addrOpen} setAddrOpen={setAddrOpen} isNew={false}/>
         <NotesLog log={f.log||[]} onUpdate={v=>set('log',v)}/>
         <button className={`sv${saved?' ok':''}`} onClick={hSave}>{saved?'✓ Saved':'Save Changes'}</button>
         <div style={{textAlign:'center',marginTop:22}}>
@@ -663,13 +717,11 @@ function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
   );
 }
 
-// ── Add ───────────────────────────────────────────────────────────────────────
 function Add({onSave,onBack}){
   const th=useTh();
-  const [f,setF]=useState({id:uid(),fn:'',ln:'',ph:'',em:'',src:'SOI',met:todayStr(),na:'',nad:'',bn:'',notes:'',freq:'flow',status:'static',birthday:'',starter:'',log:[],addr1:'',city:'',state:'',zip:'',anniversaries:[]});
+  const [f,setF]=useState({id:uid(),fn:'',ln:'',ph:'',em:'',src:'SOI',met:todayStr(),na:'',nad:'',bn:'',notes:'',freq:'monthly',status:'new',birthday:'',starter:'',log:[],addr1:'',city:'',state:'',zip:'',anniversaries:[]});
   const [addrOpen,setAddrOpen]=useState(false);
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
-  const hFreq=k=>{const days=FREQ[k]?.days;set('freq',k);if(days)set('nad',addDays(todayStr(),days));};
   return(
     <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
       <div style={{background:th.hdr,padding:'14px 18px',flexShrink:0,display:'flex',alignItems:'center',gap:12}}>
@@ -677,60 +729,13 @@ function Add({onSave,onBack}){
         <div style={{fontFamily:'Cormorant Garamond',fontSize:22,fontWeight:400,color:'#F6F1E9'}}>New Contact</div>
       </div>
       <div style={{flex:1,overflowY:'auto',padding:'18px 16px 40px',background:th.bg}}>
-        <Fld label="Contact">
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
-            <input placeholder="First name" value={f.fn} onChange={e=>set('fn',e.target.value)}/>
-            <input placeholder="Last name" value={f.ln} onChange={e=>set('ln',e.target.value)}/>
-          </div>
-          <input placeholder="Phone" value={f.ph} onChange={e=>set('ph',e.target.value)} style={{marginBottom:10}}/>
-          <input placeholder="Email" value={f.em} onChange={e=>set('em',e.target.value)} style={{marginBottom:10}}/>
-          {addrOpen?(
-            <div>
-              <input placeholder="Street address" value={f.addr1} onChange={e=>set('addr1',e.target.value)} style={{marginBottom:8}}/>
-              <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr',gap:8,marginBottom:8}}>
-                <input placeholder="City" value={f.city} onChange={e=>set('city',e.target.value)}/>
-                <input placeholder="State" value={f.state} onChange={e=>set('state',e.target.value)}/>
-                <input placeholder="ZIP" value={f.zip} onChange={e=>set('zip',e.target.value)}/>
-              </div>
-              <button onClick={()=>setAddrOpen(false)} style={{background:'transparent',border:'none',color:th.tLt,fontSize:11,cursor:'pointer',padding:0,textDecoration:'underline',opacity:0.6,marginBottom:10,display:'block'}}>Hide address</button>
-            </div>
-          ):(
-            <button onClick={()=>setAddrOpen(true)} style={{background:'transparent',border:'none',color:th.tLt,fontSize:11,cursor:'pointer',padding:0,textDecoration:'underline',opacity:0.6,marginBottom:10,display:'block'}}>+ Add address</button>
-          )}
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
-            <input placeholder="First met" value={f.met} onChange={e=>set('met',e.target.value)}/>
-            <input placeholder="Budget" value={f.bn} onChange={e=>set('bn',e.target.value)}/>
-          </div>
-          <select value={f.src} onChange={e=>set('src',e.target.value)} style={{marginBottom:10}}>
-            {SOURCES.map(s=><option key={s} value={s}>{s}</option>)}
-          </select>
-          <textarea placeholder="Background info: who they are, what you know, context that's unlikely to change…" value={f.notes} onChange={e=>set('notes',e.target.value)}/>
-        </Fld>
-        <Divider/>
-        <div style={{marginBottom:18}}>
-          <span className="sl">Conversation</span>
-          <input placeholder="Topic starter (appears on the contact card)" value={f.starter} onChange={e=>set('starter',e.target.value)}/>
-        </div>
-        <div style={{marginBottom:18}}>
-          <span className="sl">Birthday</span>
-          <input type="date" value={f.birthday} onChange={e=>set('birthday',e.target.value)}/>
-        </div>
-        <AnniversarySection anniversaries={f.anniversaries} onChange={v=>set('anniversaries',v)}/>
-        <Divider/>
-        <ConnectionSection freq={f.freq} status={f.status} onFreq={hFreq} onStatus={k=>set('status',k)}/>
-        <Fld label="Scheduling">
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-            <input type="date" value={f.nad} onChange={e=>set('nad',e.target.value)}/>
-            <input placeholder="Method: call, drop by, send a note…" value={f.na} onChange={e=>set('na',e.target.value)}/>
-          </div>
-        </Fld>
+        <ContactForm f={f} set={set} addrOpen={addrOpen} setAddrOpen={setAddrOpen} isNew={true}/>
         <button className="sv" onClick={()=>{if(f.fn.trim())onSave(f);}} style={{marginTop:8,opacity:f.fn.trim()?1:0.45}}>Add to Small Circles</button>
       </div>
     </div>
   );
 }
 
-// ── Info Panel ────────────────────────────────────────────────────────────────
 function InfoPanel({onClose,onExport,onImport,lastExport}){
   const importRef=useRef();
   const daysSince=lastExport?Math.abs(daysUntil(lastExport)):null;
@@ -738,76 +743,32 @@ function InfoPanel({onClose,onExport,onImport,lastExport}){
     <div onClick={onClose} style={{position:'fixed',inset:0,background:'#16293D',zIndex:500,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:32,overflowY:'auto'}}>
       <div style={{textAlign:'center',maxWidth:300,width:'100%'}} onClick={e=>e.stopPropagation()}>
         <Pulsar size={46} color="#C9A870"/>
-        <div style={{fontFamily:'Cormorant Garamond',fontSize:22,fontWeight:300,color:'#F6F1E9',letterSpacing:'0.14em',marginTop:14,marginBottom:24,textTransform:'uppercase'}}>Small Circles</div>
-
-        <div style={{marginBottom:22,textAlign:'left'}}>
-          <div style={{fontFamily:'Inter',fontSize:9,letterSpacing:'0.18em',color:'#C9A870',textTransform:'uppercase',marginBottom:12}}>Frequency</div>
-          {Object.values(FREQ).map(f=>(
-            <div key={f.key} style={{display:'flex',alignItems:'center',gap:10,marginBottom:9}}>
-              <span className="badge" style={{color:f.color,background:f.bg,minWidth:52,justifyContent:'center'}}>{f.label}</span>
-              <span style={{fontFamily:'Cormorant Garamond',fontSize:16,color:'rgba(246,241,233,0.75)'}}>{f.desc}</span>
-            </div>
-          ))}
-        </div>
-        <div style={{textAlign:'left',borderTop:'1px solid rgba(201,168,112,0.2)',paddingTop:20,marginBottom:24}}>
-          <div style={{fontFamily:'Inter',fontSize:9,letterSpacing:'0.18em',color:'#C9A870',textTransform:'uppercase',marginBottom:12}}>Status</div>
-          {Object.values(STATUS).map(s=>(
-            <div key={s.key} style={{display:'flex',alignItems:'flex-start',gap:10,marginBottom:9}}>
-              <span className="badge" style={{color:'#C4D9EE',background:'rgba(92,143,181,0.2)',minWidth:52,justifyContent:'center',flexShrink:0}}>{s.label}</span>
-              <span style={{fontFamily:'Cormorant Garamond',fontSize:15,color:'rgba(246,241,233,0.65)',lineHeight:1.5}}>{s.desc}</span>
-            </div>
-          ))}
-        </div>
-
-        <div style={{borderTop:'1px solid rgba(201,168,112,0.2)',paddingTop:20,textAlign:'left'}}>
+        <div style={{fontFamily:'Cormorant Garamond',fontSize:22,fontWeight:300,color:'#F6F1E9',letterSpacing:'0.14em',marginTop:14,marginBottom:28,textTransform:'uppercase'}}>Small Circles</div>
+        <div style={{textAlign:'left'}}>
           <div style={{fontFamily:'Inter',fontSize:9,letterSpacing:'0.18em',color:'#C9A870',textTransform:'uppercase',marginBottom:14}}>Data Backup</div>
-          <div style={{fontSize:11,color:'rgba(246,241,233,0.45)',fontFamily:'Inter',marginBottom:14,lineHeight:1.6}}>
-            {lastExport?`Last exported ${daysSince} day${daysSince!==1?'s':''} ago · ${fmtDate(lastExport)}`:'Never exported — your contacts exist only in this browser.'}
+          <div style={{fontSize:11,color:'rgba(246,241,233,0.45)',fontFamily:'Inter',marginBottom:16,lineHeight:1.7}}>
+            {lastExport?`Last exported ${daysSince} day${daysSince!==1?'s':''} ago · ${fmtDate(lastExport)}`:'Never exported — your contacts exist only in this browser.'}{'\n'}Export weekly and keep the file in iCloud or Google Drive to keep your data safe.
           </div>
           <button onClick={e=>{e.stopPropagation();onExport();}} style={{width:'100%',padding:'10px',background:'rgba(168,124,56,0.2)',border:'1px solid rgba(168,124,56,0.45)',borderRadius:8,color:'#C9A870',fontFamily:'Inter',fontSize:12,fontWeight:500,cursor:'pointer',marginBottom:10,letterSpacing:'0.06em'}}>
             ↓ Export contacts
           </button>
           <input ref={importRef} type="file" accept=".json" style={{display:'none'}} onChange={e=>{onImport(e.target.files[0]);e.target.value='';}}/>
-          <button onClick={e=>{e.stopPropagation();importRef.current.click();}} style={{width:'100%',padding:'10px',background:'transparent',border:'1px solid rgba(201,168,112,0.2)',borderRadius:8,color:'rgba(246,241,233,0.45)',fontFamily:'Inter',fontSize:12,cursor:'pointer',letterSpacing:'0.06em'}}>
+          <button onClick={e=>{e.stopPropagation();importRef.current.click();}} style={{width:'100%',padding:'10px',background:'transparent',border:'1px solid rgba(201,168,112,0.2)',borderRadius:8,color:'rgba(246,241,233,0.45)',fontFamily:'Inter',fontSize:12,cursor:'pointer',letterSpacing:'0.06em',marginBottom:24}}>
             ↑ Import backup
           </button>
+          <div style={{borderTop:'1px solid rgba(201,168,112,0.15)',paddingTop:20}}>
+            <div style={{fontFamily:'Inter',fontSize:9,letterSpacing:'0.18em',color:'#C9A870',textTransform:'uppercase',marginBottom:12}}>Customization</div>
+            <div style={{fontSize:11,color:'rgba(246,241,233,0.45)',fontFamily:'Inter',lineHeight:1.7}}>
+              This app was built with Claude at claude.ai. Take your index.html to Claude and describe any changes you want — colors, fields, features. No coding required.
+            </div>
+          </div>
         </div>
-
-        <div style={{fontFamily:'Inter',fontSize:10,color:'rgba(201,168,112,0.3)',marginTop:24,letterSpacing:'0.1em'}} onClick={onClose}>Tap outside to dismiss</div>
+        <div style={{fontFamily:'Inter',fontSize:10,color:'rgba(201,168,112,0.3)',marginTop:28,letterSpacing:'0.1em'}} onClick={onClose}>Tap outside to dismiss</div>
       </div>
     </div>
   );
 }
 
-// ── Bottom Nav ────────────────────────────────────────────────────────────────
-function BottomNav({active,onNav}){
-  const th=useTh();
-  const items=[
-    {key:'home',label:'Home',dot:'#C9A870'},
-    {key:'all',label:'All',dot:'#9E9288'},
-    {key:'pulse',label:'Pulse',dot:FREQ.pulse.color},
-    {key:'flow',label:'Flow',dot:FREQ.flow.color},
-    {key:'phase',label:'Phase',dot:FREQ.phase.color},
-    {key:'revolve',label:'Revolve',dot:FREQ.revolve.color},
-    {key:'rest',label:'Rest',dot:FREQ.rest.color},
-  ];
-  return(
-    <div style={{background:th.lHead,borderTop:`1px solid ${th.bdr}`,display:'flex',flexShrink:0}}>
-      {items.map(item=>{
-        const isAct=active===item.key;
-        return(
-          <button key={item.key} onClick={()=>onNav(item.key)}
-            style={{flex:1,background:'transparent',border:'none',padding:'10px 4px 9px',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3}}>
-            <div style={{width:6,height:6,borderRadius:'50%',background:isAct?item.dot:'transparent',border:isAct?'none':`1px solid ${th.bdr}`,transition:'all 0.15s'}}/>
-            <span style={{fontFamily:'Inter',fontSize:8,fontWeight:isAct?500:400,letterSpacing:'0.1em',color:isAct?item.dot:th.tLt,textTransform:'uppercase',transition:'color 0.15s'}}>{item.label}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-// ── App ───────────────────────────────────────────────────────────────────────
 function App(){
   const [ip,setIp]=useState('visible');
   const [dark,setDark]=useState(()=>localStorage.getItem('sc-dark')==='1');
@@ -822,18 +783,23 @@ function App(){
   const [lastExport,setLastExport]=useState(()=>localStorage.getItem('sc-last-export')||null);
   const [dismissed,setDismissed]=useState(()=>localStorage.getItem('sc-export-dismissed')===todayStr());
   const [toast,setToast]=useState(null);
-
   const th=mkTh(dark);
 
   useEffect(()=>{
     const t1=setTimeout(()=>setIp('fading'),4500);
     const t2=setTimeout(()=>setIp('done'),5300);
-    const saved=load();setContacts(saved||DEFAULTS);
+    const saved=load();
+    const raw=saved||DEFAULTS;
+    setContacts(raw.map(migrateContact));
     return()=>{clearTimeout(t1);clearTimeout(t2);};
   },[]);
 
   const persist=next=>{setContacts(next);save(next);};
-  const handleNav=k=>{setNav(k);if(k==='home'){setScreen('dashboard');}else{setFf(k==='all'?null:k);setScreen('list');}};
+  const handleNav=k=>{
+    setNav(k);
+    if(k==='home'){setScreen('dashboard');}
+    else{setFf(k==='all'?null:k);setScreen('list');}
+  };
   const openContact=id=>{setPrev(screen);setSid(id);setScreen('detail');};
   const quickLog=id=>{
     const c=contacts.find(x=>x.id===id);if(!c)return;
@@ -852,7 +818,6 @@ function App(){
   };
   const showToast=msg=>{setToast(msg);setTimeout(()=>setToast(null),3000);};
   const toggleDark=()=>{const nd=!dark;setDark(nd);localStorage.setItem('sc-dark',nd?'1':'0');};
-
   const doExport=()=>{
     const blob=new Blob([JSON.stringify(contacts,null,2)],{type:'application/json'});
     const url=URL.createObjectURL(blob);
@@ -869,7 +834,7 @@ function App(){
     r.onload=ev=>{
       try{
         const data=JSON.parse(ev.target.result);
-        if(Array.isArray(data)&&data.length>0){persist(data);setInfoOpen(false);showToast(`✓ ${data.length} contacts imported`);}
+        if(Array.isArray(data)&&data.length>0){persist(data.map(migrateContact));setInfoOpen(false);showToast(`✓ ${data.length} contacts imported`);}
         else showToast('No contacts found in file');
       }catch{showToast('Invalid backup file');}
     };
@@ -877,9 +842,7 @@ function App(){
   };
   const dismissReminder=()=>{localStorage.setItem('sc-export-dismissed',todayStr());setDismissed(true);};
   const showReminder=!dismissed&&(!lastExport||(daysUntil(lastExport)||0)<-7);
-
   const sel=contacts.find(c=>c.id===sid);
-  const showNav=screen!=='detail'&&screen!=='add';
 
   return(
     <ThCtx.Provider value={th}>
@@ -887,17 +850,18 @@ function App(){
       {ip!=='done'&&<Intro phase={ip}/>}
       {infoOpen&&<InfoPanel onClose={()=>setInfoOpen(false)} onExport={doExport} onImport={doImport} lastExport={lastExport}/>}
       {toast&&(
-        <div style={{position:'fixed',bottom:90,left:'50%',transform:'translateX(-50%)',background:'#16293D',color:'#C9A870',padding:'10px 20px',borderRadius:8,fontSize:12,fontFamily:'Inter',zIndex:900,whiteSpace:'nowrap',boxShadow:'0 4px 20px rgba(0,0,0,0.25)'}}>
+        <div style={{position:'fixed',bottom:70,left:'50%',transform:'translateX(-50%)',background:'#16293D',color:'#C9A870',padding:'10px 20px',borderRadius:8,fontSize:12,fontFamily:'Inter',zIndex:900,whiteSpace:'nowrap',boxShadow:'0 4px 20px rgba(0,0,0,0.25)'}}>
           {toast}
         </div>
       )}
       <div style={{maxWidth:600,margin:'0 auto',height:'100vh',display:'flex',flexDirection:'column',background:th.bg,opacity:ip!=='done'?0:1,transition:'opacity 0.5s ease-out'}}>
+        {screen!=='detail'&&screen!=='add'&&<TopNav active={nav} onNav={handleNav}/>}
         {screen==='dashboard'&&(
           <Dashboard contacts={contacts} onOpen={openContact} onQL={quickLog} logged={logged}
             onInfo={()=>setInfoOpen(true)} onAdd={()=>{setPrev(screen);setScreen('add');}}
             onUnsched={()=>{setFf('unscheduled');setNav('all');setScreen('list');}}
             showReminder={showReminder} lastExport={lastExport} onExport={doExport} onDismiss={dismissReminder}
-            dark={dark} onToggleDark={toggleDark}/>
+            onToggleDark={toggleDark}/>
         )}
         {screen==='list'&&(
           <List contacts={contacts} freqFilter={ff} onOpen={openContact} onQL={quickLog} logged={logged}
@@ -920,7 +884,6 @@ function App(){
           <Add onSave={data=>{saveContact(data);setFf(null);setNav('all');setScreen('list');}}
             onBack={()=>setScreen(prev)}/>
         )}
-        {showNav&&<BottomNav active={nav} onNav={handleNav}/>}
       </div>
     </ThCtx.Provider>
   );
