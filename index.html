@@ -43,18 +43,43 @@ textarea{resize:vertical;min-height:72px;}
 <script type="text/babel">
 const {useState,useEffect,useRef,createContext,useContext}=React;
 
+// ── Supabase config ───────────────────────────────────────────────────────────
+// Paste your values below. Leave as-is to use local storage only.
+const SB_URL='https://pltwmvfpdyusfboxcpwm.supabase.co';
+const SB_KEY='sb_publishable_znxBDxuBl_rDrHO2xxMxmA_fUuEha5n';
+const USE_SB=SB_URL!=='YOUR_SUPABASE_URL'&&SB_KEY!=='YOUR_SUPABASE_PUBLISHABLE_KEY';
+const SB_ROW='sc-contacts';
+
+const sbLoad=async()=>{
+  try{
+    const r=await fetch(`${SB_URL}/rest/v1/contacts?id=eq.${SB_ROW}&select=data`,{headers:{apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`}});
+    const rows=await r.json();
+    if(rows&&rows.length>0&&rows[0].data)return rows[0].data;
+    return null;
+  }catch{return null;}
+};
+const sbSave=async d=>{
+  try{
+    await fetch(`${SB_URL}/rest/v1/contacts`,{
+      method:'POST',
+      headers:{apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates'},
+      body:JSON.stringify({id:SB_ROW,data:d,updated_at:new Date().toISOString()})
+    });
+  }catch{}
+};
+const SK='sc-v4';
+const lsLoad=()=>{try{const d=localStorage.getItem(SK);return d?JSON.parse(d):null;}catch{return null;}};
+const lsSave=d=>{try{localStorage.setItem(SK,JSON.stringify(d));}catch{}};
+const loadContacts=async()=>{if(USE_SB){const d=await sbLoad();if(d)return d;}return lsLoad();};
+const saveContacts=async d=>{lsSave(d);if(USE_SB)await sbSave(d);};
+
+// ── Theme ─────────────────────────────────────────────────────────────────────
 const mkTh=dk=>({
-  bg:    dk?'#1C1814':'#F6F1E9',
-  card:  dk?'#28211A':'#FDFAF4',
-  text:  dk?'#F0EBE3':'#241E18',
-  tMed:  dk?'#C5B59A':'#5E5248',
-  tLt:   dk?'#6E6158':'#9E9288',
-  bdr:   dk?'#3D3028':'#E2D8CC',
-  noteBg:dk?'#241E18':'#F0EDE7',
-  lHead: dk?'#241E18':'#FDFAF4',
-  hdr:   dk?'#0D1B28':'#16293D',
-  inBg:  dk?'#1C1814':'#F6F1E9',
-  pillBdr:dk?'#5A4A3A':'#C5B59A',
+  bg:dk?'#1C1814':'#F6F1E9',card:dk?'#28211A':'#FDFAF4',
+  text:dk?'#F0EBE3':'#241E18',tMed:dk?'#C5B59A':'#5E5248',
+  tLt:dk?'#6E6158':'#9E9288',bdr:dk?'#3D3028':'#E2D8CC',
+  noteBg:dk?'#241E18':'#F0EDE7',lHead:dk?'#241E18':'#FDFAF4',
+  hdr:dk?'#0D1B28':'#16293D',pillBdr:dk?'#5A4A3A':'#C5B59A',
 });
 const dynCSS=dk=>`
 body{background:${dk?'#1C1814':'#F6F1E9'};color:${dk?'#F0EBE3':'#241E18'};}
@@ -73,21 +98,20 @@ input:focus,textarea:focus,select:focus{border-color:${dk?'#7A6A58':'#C5B59A'};}
 const ThCtx=createContext({});
 const useTh=()=>useContext(ThCtx);
 
+// ── Constants ─────────────────────────────────────────────────────────────────
 const FREQ={
-  weekly:   {key:'weekly',   label:'Weekly',    days:7},
-  monthly:  {key:'monthly',  label:'Monthly',   days:30},
-  quarterly:{key:'quarterly',label:'Quarterly', days:90},
-  annually: {key:'annually', label:'Annually',  days:365},
-  bespoke:  {key:'bespoke',  label:'Bespoke',   days:null},
+  weekly:   {key:'weekly',   label:'Weekly',   days:7},
+  monthly:  {key:'monthly',  label:'Monthly',  days:30},
+  quarterly:{key:'quarterly',label:'Quarterly',days:90},
+  annually: {key:'annually', label:'Annually', days:365},
+  bespoke:  {key:'bespoke',  label:'Bespoke',  days:null},
 };
 const STATUS={
-  new:       {key:'new',       label:'New',       desc:'A new connection'},
-  nurturing: {key:'nurturing', label:'Nurturing', desc:'Building a relationship'},
-  active:    {key:'active',    label:'Active',    desc:'In motion — priority contact'},
-  legacy:    {key:'legacy',    label:'Legacy',    desc:'A valued past client'},
+  new:      {key:'new',      label:'New',      desc:'A new connection'},
+  nurturing:{key:'nurturing',label:'Nurturing',desc:'Building a relationship'},
+  active:   {key:'active',   label:'Active',   desc:'In motion — priority contact'},
+  legacy:   {key:'legacy',   label:'Legacy',   desc:'A valued past client'},
 };
-
-// freq color map
 const FCOLOR={
   weekly:   {color:'#B0607A',bg:'#EECDD6'},
   monthly:  {color:'#5C8FB5',bg:'#C4D9EE'},
@@ -95,10 +119,10 @@ const FCOLOR={
   annually: {color:'#4E7C5A',bg:'#C0D4C4'},
   bespoke:  {color:'#6E6158',bg:'#D5CEC5'},
 };
-
 const SOURCES=['SOI','Open House','Referral','Social Media','Networking Event','Door Knocking','Farm','Other'];
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 
+// ── Utils ─────────────────────────────────────────────────────────────────────
 const todayStr=()=>new Date().toISOString().split('T')[0];
 const addDays=(str,n)=>{const d=new Date((str||todayStr())+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().split('T')[0];};
 const daysUntil=str=>str?Math.round((new Date(str+'T00:00:00')-new Date(todayStr()+'T00:00:00'))/86400000):null;
@@ -125,7 +149,6 @@ const fmtBday=str=>{
 const bdayIn14=str=>{const d=parseBday(str);if(!d)return false;const diff=(d-new Date())/86400000;return diff>=0&&diff<=14;};
 const bdayDays=str=>{const d=parseBday(str);if(!d)return null;return Math.max(0,Math.round((d-new Date())/86400000));};
 
-// migrate old freq/status keys
 const migrateContact=c=>({
   addr1:'',city:'',state:'',zip:'',anniversaries:[],...c,
   freq:({pulse:'weekly',flow:'monthly',phase:'quarterly',revolve:'annually',rest:'bespoke'}[c.freq]||c.freq||'monthly'),
@@ -134,9 +157,7 @@ const migrateContact=c=>({
 
 const mk=(fn,ln,ph,em,src,lc,meth,res,na,bn,notes,met,starter)=>({
   id:uid(),fn,ln,ph:ph||'',em:em||'',src,met:met||'',lc:lc||'',meth:meth||'',res:res||'',na:na||'',nad:'',
-  bn:bn||'',notes:notes||'',
-  freq:src==='Open House'?'quarterly':'monthly',
-  status:'new',
+  bn:bn||'',notes:notes||'',freq:src==='Open House'?'quarterly':'monthly',status:'new',
   birthday:'',starter:starter||'',log:[],addr1:'',city:'',state:'',zip:'',anniversaries:[],
 });
 
@@ -258,55 +279,7 @@ const DEFAULTS=[
   mk('Kerry','Newman','(310) 804-9428','kerrylindsaynewman@yahoo.com','Open House','','','','Call'),
 ];
 
-// ── Supabase config ───────────────────────────────────────────────────────────
-// Paste your values from Supabase below. Leave as-is to use local storage only.
-const SB_URL = 'YOUR_SUPABASE_URL';         // e.g. https://xxxx.supabase.co
-const SB_KEY = 'YOUR_SUPABASE_PUBLISHABLE_KEY'; // e.g. sb_publishable_xxxx
-
-const useSupabase = SB_URL !== 'YOUR_SUPABASE_URL' && SB_KEY !== 'YOUR_SUPABASE_PUBLISHABLE_KEY';
-const SB_ROW_ID = 'sc-contacts';
-
-const sbLoad = async () => {
-  try {
-    const res = await fetch(`${SB_URL}/rest/v1/contacts?id=eq.${SB_ROW_ID}&select=data`, {
-      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }
-    });
-    const rows = await res.json();
-    if (rows && rows.length > 0 && rows[0].data) return rows[0].data;
-    return null;
-  } catch { return null; }
-};
-
-const sbSave = async (contacts) => {
-  try {
-    await fetch(`${SB_URL}/rest/v1/contacts`, {
-      method: 'POST',
-      headers: {
-        apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`,
-        'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates'
-      },
-      body: JSON.stringify({ id: SB_ROW_ID, data: contacts, updated_at: new Date().toISOString() })
-    });
-  } catch {}
-};
-
-const SK = 'sc-v4';
-const lsLoad = () => { try { const d = localStorage.getItem(SK); return d ? JSON.parse(d) : null; } catch { return null; } };
-const lsSave = d => { try { localStorage.setItem(SK, JSON.stringify(d)); } catch {} };
-
-const loadContacts = async () => {
-  if (useSupabase) {
-    const d = await sbLoad();
-    if (d) return d;
-  }
-  return lsLoad();
-};
-
-const saveContacts = async (contacts) => {
-  lsSave(contacts); // always save locally as backup
-  if (useSupabase) await sbSave(contacts);
-};
-
+// ── Shared UI ─────────────────────────────────────────────────────────────────
 function Pulsar({size=80,color='#C9A870',animate=false,onClick}){
   const cx=80,cy=80,outer=52,circles=[22,36,52],lens=[22,16,11];
   return(
@@ -354,6 +327,35 @@ const Divider=()=>{
     </div>
   );
 };
+
+function TopNav({active,onNav}){
+  const th=useTh();
+  const items=[
+    {key:'home',label:'Home'},
+    {key:'all',label:'All'},
+    {key:'weekly',label:'Weekly'},
+    {key:'monthly',label:'Monthly'},
+    {key:'quarterly',label:'Quarterly'},
+    {key:'annually',label:'Annually'},
+    {key:'bespoke',label:'Bespoke'},
+  ];
+  return(
+    <div style={{background:th.lHead,borderBottom:`1px solid ${th.bdr}`,display:'flex',flexShrink:0}}>
+      {items.map(item=>{
+        const isAct=active===item.key;
+        const fc=FCOLOR[item.key];
+        const dot=fc?fc.color:'#C9A870';
+        return(
+          <button key={item.key} onClick={()=>onNav(item.key)}
+            style={{flex:1,background:'transparent',border:'none',padding:'8px 2px 7px',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,borderBottom:isAct?`2px solid ${dot}`:'2px solid transparent',transition:'all 0.15s'}}>
+            <div style={{width:5,height:5,borderRadius:'50%',background:isAct?dot:'transparent',border:isAct?'none':`1px solid ${th.bdr}`,transition:'all 0.15s'}}/>
+            <span style={{fontFamily:'Inter',fontSize:8,fontWeight:isAct?500:400,letterSpacing:'0.06em',color:isAct?dot:th.tLt,textTransform:'uppercase',transition:'color 0.15s'}}>{item.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 function ConnectionSection({freq,status,onFreq,onStatus}){
   const th=useTh();
@@ -460,35 +462,6 @@ function NotesLog({log,onUpdate}){
   );
 }
 
-function TopNav({active,onNav}){
-  const th=useTh();
-  const items=[
-    {key:'home',label:'Home'},
-    {key:'all',label:'All'},
-    {key:'weekly',label:'Weekly'},
-    {key:'monthly',label:'Monthly'},
-    {key:'quarterly',label:'Quarterly'},
-    {key:'annually',label:'Annually'},
-    {key:'bespoke',label:'Bespoke'},
-  ];
-  return(
-    <div style={{background:th.lHead,borderBottom:`1px solid ${th.bdr}`,display:'flex',flexShrink:0}}>
-      {items.map(item=>{
-        const isAct=active===item.key;
-        const fc=FCOLOR[item.key];
-        const dotColor=fc?fc.color:'#C9A870';
-        return(
-          <button key={item.key} onClick={()=>onNav(item.key)}
-            style={{flex:1,background:'transparent',border:'none',padding:'8px 4px 7px',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,borderBottom:isAct?`2px solid ${dotColor}`:'2px solid transparent',transition:'all 0.15s'}}>
-            <div style={{width:5,height:5,borderRadius:'50%',background:isAct?dotColor:'transparent',border:isAct?'none':`1px solid ${th.bdr}`,transition:'all 0.15s'}}/>
-            <span style={{fontFamily:'Inter',fontSize:8,fontWeight:isAct?500:400,letterSpacing:'0.08em',color:isAct?dotColor:th.tLt,textTransform:'uppercase',whiteSpace:'nowrap',transition:'color 0.15s'}}>{item.label}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 function CCard({c,onOpen,onQL,logged}){
   const th=useTh();
   const fc=FCOLOR[c.freq]||FCOLOR.monthly;
@@ -522,6 +495,68 @@ function CCard({c,onOpen,onQL,logged}){
         </button>
       </div>
     </div>
+  );
+}
+
+function ContactForm({f,set,addrOpen,setAddrOpen}){
+  const th=useTh();
+  const hFreq=k=>{const days=FREQ[k]?.days;set('freq',k);if(days)set('nad',addDays(todayStr(),days));};
+  return(
+    <>
+      <Fld label="Contact">
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
+          <input placeholder="First name" value={f.fn||''} onChange={e=>set('fn',e.target.value)}/>
+          <input placeholder="Last name" value={f.ln||''} onChange={e=>set('ln',e.target.value)}/>
+        </div>
+        <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:10}}>
+          <input placeholder="Phone" value={f.ph||''} onChange={e=>set('ph',e.target.value)} style={{flex:1}}/>
+          {f.ph&&<a href={`tel:${f.ph}`} style={{color:'#5C8FB5',fontSize:18,textDecoration:'none',flexShrink:0}}>📞</a>}
+        </div>
+        <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:10}}>
+          <input placeholder="Email" value={f.em||''} onChange={e=>set('em',e.target.value)} style={{flex:1}}/>
+          {f.em&&<a href={`mailto:${f.em}`} style={{color:'#5C8FB5',fontSize:18,textDecoration:'none',flexShrink:0}}>✉</a>}
+        </div>
+        {addrOpen?(
+          <div style={{marginBottom:10}}>
+            <input placeholder="Street address" value={f.addr1||''} onChange={e=>set('addr1',e.target.value)} style={{marginBottom:8}}/>
+            <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr',gap:8}}>
+              <input placeholder="City" value={f.city||''} onChange={e=>set('city',e.target.value)}/>
+              <input placeholder="State" value={f.state||''} onChange={e=>set('state',e.target.value)}/>
+              <input placeholder="ZIP" value={f.zip||''} onChange={e=>set('zip',e.target.value)}/>
+            </div>
+            <button onClick={()=>setAddrOpen(false)} style={{background:'transparent',border:'none',color:th.tLt,fontSize:11,cursor:'pointer',marginTop:6,padding:0,textDecoration:'underline',opacity:0.6}}>Hide address</button>
+          </div>
+        ):(
+          <button onClick={()=>setAddrOpen(true)} style={{background:'transparent',border:'none',color:th.tLt,fontSize:11,cursor:'pointer',padding:0,textDecoration:'underline',opacity:0.6,marginBottom:10,display:'block'}}>+ Add address</button>
+        )}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
+          <input placeholder="First met" value={f.met||''} onChange={e=>set('met',e.target.value)}/>
+          <input placeholder="Budget" value={f.bn||''} onChange={e=>set('bn',e.target.value)}/>
+        </div>
+        <select value={f.src||'SOI'} onChange={e=>set('src',e.target.value)} style={{marginBottom:10}}>
+          {SOURCES.map(s=><option key={s} value={s}>{s}</option>)}
+        </select>
+        <textarea placeholder="Background info: who they are, what you know, context that's unlikely to change…" value={f.notes||''} onChange={e=>set('notes',e.target.value)}/>
+      </Fld>
+      <Divider/>
+      <div style={{marginBottom:18}}>
+        <span className="sl">Conversation</span>
+        <input placeholder="Topic starter (appears on the contact card)" value={f.starter||''} onChange={e=>set('starter',e.target.value)}/>
+      </div>
+      <div style={{marginBottom:18}}>
+        <span className="sl">Birthday</span>
+        <input type="date" value={f.birthday||''} onChange={e=>set('birthday',e.target.value)}/>
+      </div>
+      <AnniversarySection anniversaries={f.anniversaries||[]} onChange={v=>set('anniversaries',v)}/>
+      <Divider/>
+      <ConnectionSection freq={f.freq} status={f.status} onFreq={hFreq} onStatus={k=>set('status',k)}/>
+      <Fld label="Scheduling">
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+          <input type="date" value={f.nad||''} onChange={e=>set('nad',e.target.value)}/>
+          <input placeholder="Method: call, drop by, send a note…" value={f.na||''} onChange={e=>set('na',e.target.value)}/>
+        </div>
+      </Fld>
+    </>
   );
 }
 
@@ -561,7 +596,7 @@ function Dashboard({contacts,onOpen,onQL,logged,onInfo,onAdd,onUnsched,showRemin
       {showReminder&&(
         <div style={{background:'rgba(168,124,56,0.12)',borderBottom:'1px solid rgba(168,124,56,0.25)',padding:'10px 16px',display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
           <span style={{fontSize:12,color:'#A87C38',flex:1,fontFamily:'Inter'}}>
-            {lastExport?`Last backup: ${daysSince} day${daysSince!==1?'s':''} ago.`:'Your contacts have never been backed up.'} Export now?
+            {lastExport?`Last backup: ${daysSince} days ago.`:'Contacts not yet backed up.'} Export now?
           </span>
           <button onClick={e=>{e.stopPropagation();onExport();onDismiss();}} style={{background:'#A87C38',color:'#F6F1E9',border:'none',borderRadius:6,padding:'4px 12px',fontSize:11,cursor:'pointer',fontFamily:'Inter',fontWeight:500,whiteSpace:'nowrap'}}>Export</button>
           <button onClick={onDismiss} style={{background:'transparent',border:'none',color:'#A87C38',fontSize:16,cursor:'pointer',opacity:0.6,padding:'0 2px',lineHeight:1}}>×</button>
@@ -603,7 +638,7 @@ function Dashboard({contacts,onOpen,onQL,logged,onInfo,onAdd,onUnsched,showRemin
       <div style={{padding:'10px 20px',background:th.lHead,borderTop:`1px solid ${th.bdr}`,display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
         <button onClick={onInfo} style={{background:'transparent',border:`1px solid ${th.pillBdr}`,borderRadius:'50%',width:28,height:28,cursor:'pointer',color:th.tLt,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',fontStyle:'italic',fontFamily:'serif',fontWeight:'bold'}}>i</button>
         <div style={{fontFamily:'Inter',fontSize:9,color:th.tLt,letterSpacing:'0.1em',textTransform:'uppercase',opacity:0.5}}>
-          {lastExport?`Backed up ${Math.abs(daysUntil(lastExport))} days ago`:'Not yet backed up'}
+          {USE_SB?'Syncing to cloud':(lastExport?`Backed up ${Math.abs(daysUntil(lastExport))} days ago`:'Not yet backed up')}
         </div>
       </div>
     </div>
@@ -657,68 +692,6 @@ function List({contacts,freqFilter,onOpen,onQL,logged,onAdd}){
   );
 }
 
-function ContactForm({f,set,addrOpen,setAddrOpen,isNew}){
-  const th=useTh();
-  const hFreq=k=>{const days=FREQ[k]?.days;set('freq',k);if(days)set('nad',addDays(todayStr(),days));};
-  return(
-    <>
-      <Fld label="Contact">
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
-          <input placeholder="First name" value={f.fn||''} onChange={e=>set('fn',e.target.value)}/>
-          <input placeholder="Last name" value={f.ln||''} onChange={e=>set('ln',e.target.value)}/>
-        </div>
-        <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:10}}>
-          <input placeholder="Phone" value={f.ph||''} onChange={e=>set('ph',e.target.value)} style={{flex:1}}/>
-          {!isNew&&f.ph&&<a href={`tel:${f.ph}`} style={{color:'#5C8FB5',fontSize:18,textDecoration:'none',flexShrink:0}}>📞</a>}
-        </div>
-        <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:10}}>
-          <input placeholder="Email" value={f.em||''} onChange={e=>set('em',e.target.value)} style={{flex:1}}/>
-          {!isNew&&f.em&&<a href={`mailto:${f.em}`} style={{color:'#5C8FB5',fontSize:18,textDecoration:'none',flexShrink:0}}>✉</a>}
-        </div>
-        {addrOpen?(
-          <div style={{marginBottom:10}}>
-            <input placeholder="Street address" value={f.addr1||''} onChange={e=>set('addr1',e.target.value)} style={{marginBottom:8}}/>
-            <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr',gap:8}}>
-              <input placeholder="City" value={f.city||''} onChange={e=>set('city',e.target.value)}/>
-              <input placeholder="State" value={f.state||''} onChange={e=>set('state',e.target.value)}/>
-              <input placeholder="ZIP" value={f.zip||''} onChange={e=>set('zip',e.target.value)}/>
-            </div>
-            <button onClick={()=>setAddrOpen(false)} style={{background:'transparent',border:'none',color:th.tLt,fontSize:11,cursor:'pointer',marginTop:6,padding:0,textDecoration:'underline',opacity:0.6}}>Hide address</button>
-          </div>
-        ):(
-          <button onClick={()=>setAddrOpen(true)} style={{background:'transparent',border:'none',color:th.tLt,fontSize:11,cursor:'pointer',padding:0,textDecoration:'underline',opacity:0.6,marginBottom:10,display:'block'}}>+ Add address</button>
-        )}
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
-          <input placeholder="First met" value={f.met||''} onChange={e=>set('met',e.target.value)}/>
-          <input placeholder="Budget" value={f.bn||''} onChange={e=>set('bn',e.target.value)}/>
-        </div>
-        <select value={f.src||'SOI'} onChange={e=>set('src',e.target.value)} style={{marginBottom:10}}>
-          {SOURCES.map(s=><option key={s} value={s}>{s}</option>)}
-        </select>
-        <textarea placeholder="Background info: who they are, what you know, context that's unlikely to change…" value={f.notes||''} onChange={e=>set('notes',e.target.value)}/>
-      </Fld>
-      <Divider/>
-      <div style={{marginBottom:18}}>
-        <span className="sl">Conversation</span>
-        <input placeholder="Topic starter (appears on the contact card)" value={f.starter||''} onChange={e=>set('starter',e.target.value)}/>
-      </div>
-      <div style={{marginBottom:18}}>
-        <span className="sl">Birthday</span>
-        <input type="date" value={f.birthday||''} onChange={e=>set('birthday',e.target.value)}/>
-      </div>
-      <AnniversarySection anniversaries={f.anniversaries||[]} onChange={v=>set('anniversaries',v)}/>
-      <Divider/>
-      <ConnectionSection freq={f.freq} status={f.status} onFreq={hFreq} onStatus={k=>set('status',k)}/>
-      <Fld label="Scheduling">
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-          <input type="date" value={f.nad||''} onChange={e=>set('nad',e.target.value)}/>
-          <input placeholder="Method: call, drop by, send a note…" value={f.na||''} onChange={e=>set('na',e.target.value)}/>
-        </div>
-      </Fld>
-    </>
-  );
-}
-
 function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
   const th=useTh();
   const [f,setF]=useState({addr1:'',city:'',state:'',zip:'',anniversaries:[],...contact});
@@ -734,8 +707,8 @@ function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontFamily:'Cormorant Garamond',fontSize:22,fontWeight:400,color:'#F6F1E9',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.fn} {f.ln}</div>
           <div style={{display:'flex',gap:5,marginTop:4,flexWrap:'wrap'}}>
-            {f.freq&&<Bdg color={FCOLOR[f.freq]?.color||'#9E9288'} bg={FCOLOR[f.freq]?.bg||'#EEE'}>{FREQ[f.freq]?.label||f.freq}</Bdg>}
             {f.status&&<Bdg color="#9E9288" bg="rgba(255,255,255,0.08)">{STATUS[f.status]?.label||f.status}</Bdg>}
+            {f.freq&&<Bdg color={FCOLOR[f.freq]?.color||'#9E9288'} bg={FCOLOR[f.freq]?.bg||'#EEE'}>{FREQ[f.freq]?.label||f.freq}</Bdg>}
           </div>
         </div>
         <div style={{display:'flex',gap:6,flexShrink:0}}>
@@ -744,7 +717,7 @@ function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
         </div>
       </div>
       <div style={{flex:1,overflowY:'auto',padding:'18px 16px 40px',background:th.bg}}>
-        <ContactForm f={f} set={set} addrOpen={addrOpen} setAddrOpen={setAddrOpen} isNew={false}/>
+        <ContactForm f={f} set={set} addrOpen={addrOpen} setAddrOpen={setAddrOpen}/>
         <NotesLog log={f.log||[]} onUpdate={v=>set('log',v)}/>
         <button className={`sv${saved?' ok':''}`} onClick={hSave}>{saved?'✓ Saved':'Save Changes'}</button>
         <div style={{textAlign:'center',marginTop:22}}>
@@ -775,7 +748,7 @@ function Add({onSave,onBack}){
         <div style={{fontFamily:'Cormorant Garamond',fontSize:22,fontWeight:400,color:'#F6F1E9'}}>New Contact</div>
       </div>
       <div style={{flex:1,overflowY:'auto',padding:'18px 16px 40px',background:th.bg}}>
-        <ContactForm f={f} set={set} addrOpen={addrOpen} setAddrOpen={setAddrOpen} isNew={true}/>
+        <ContactForm f={f} set={set} addrOpen={addrOpen} setAddrOpen={setAddrOpen}/>
         <button className="sv" onClick={()=>{if(f.fn.trim())onSave(f);}} style={{marginTop:8,opacity:f.fn.trim()?1:0.45}}>Add to Small Circles</button>
       </div>
     </div>
@@ -786,32 +759,27 @@ function InfoPanel({onClose,onExport,onImport,onImportCSV,lastExport}){
   const importRef=useRef();
   const csvRef=useRef();
   const daysSince=lastExport?Math.abs(daysUntil(lastExport)):null;
-
   const downloadTemplate=()=>{
     const headers='First Name,Last Name,Phone,Email,Source,Notes,Frequency,Status,Birthday,Conversation Starter';
-    const example='Jane,Smith,(310) 555-0101,jane@email.com,SOI,Loves Brentwood. Two kids.,Monthly,Nurturing,June 12,Ask about her home search timeline';
-    const blob=new Blob([headers+'\n'+example],{type:'text/csv'});
+    const ex='Jane,Smith,(310) 555-0101,jane@email.com,SOI,Loves Brentwood. Two kids.,Monthly,Nurturing,June 12,Ask about her home search timeline';
+    const blob=new Blob([headers+'\n'+ex],{type:'text/csv'});
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
     a.href=url;a.download='small-circles-template.csv';
     document.body.appendChild(a);a.click();
     document.body.removeChild(a);URL.revokeObjectURL(url);
   };
-
   return(
     <div onClick={onClose} style={{position:'fixed',inset:0,background:'#16293D',zIndex:500,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:32,overflowY:'auto'}}>
       <div style={{textAlign:'center',maxWidth:300,width:'100%'}} onClick={e=>e.stopPropagation()}>
         <Pulsar size={46} color="#C9A870"/>
         <div style={{fontFamily:'Cormorant Garamond',fontSize:22,fontWeight:300,color:'#F6F1E9',letterSpacing:'0.14em',marginTop:14,marginBottom:28,textTransform:'uppercase'}}>Small Circles</div>
         <div style={{textAlign:'left'}}>
-
           <div style={{fontFamily:'Inter',fontSize:9,letterSpacing:'0.18em',color:'#C9A870',textTransform:'uppercase',marginBottom:14}}>Data Backup</div>
           <div style={{fontSize:11,color:'rgba(246,241,233,0.45)',fontFamily:'Inter',marginBottom:16,lineHeight:1.7}}>
-            {useSupabase
-              ? `Syncing to Supabase — your contacts are safe across all devices.${lastExport?' Last exported '+daysSince+' days ago.':''}`
-              : lastExport?`Last exported ${daysSince} days ago · ${fmtDate(lastExport)}`:'Never exported — your contacts exist only in this browser.'
-            }
-            {!useSupabase&&' Export weekly and keep the file in iCloud or Google Drive.'}
+            {USE_SB
+              ?`Syncing to Supabase — your contacts are safe across all devices.${lastExport?' Last exported '+daysSince+' days ago.':''}`
+              :(lastExport?`Last exported ${daysSince} days ago · ${fmtDate(lastExport)}`:'Never exported — contacts exist only in this browser.')+' Export weekly and keep the file in iCloud or Google Drive.'}
           </div>
           <button onClick={e=>{e.stopPropagation();onExport();}} style={{width:'100%',padding:'10px',background:'rgba(168,124,56,0.2)',border:'1px solid rgba(168,124,56,0.45)',borderRadius:8,color:'#C9A870',fontFamily:'Inter',fontSize:12,fontWeight:500,cursor:'pointer',marginBottom:8,letterSpacing:'0.06em'}}>
             ↓ Export contacts (JSON)
@@ -820,10 +788,9 @@ function InfoPanel({onClose,onExport,onImport,onImportCSV,lastExport}){
           <button onClick={e=>{e.stopPropagation();importRef.current.click();}} style={{width:'100%',padding:'10px',background:'transparent',border:'1px solid rgba(201,168,112,0.2)',borderRadius:8,color:'rgba(246,241,233,0.45)',fontFamily:'Inter',fontSize:12,cursor:'pointer',letterSpacing:'0.06em',marginBottom:20}}>
             ↑ Import backup (JSON)
           </button>
-
           <div style={{fontFamily:'Inter',fontSize:9,letterSpacing:'0.18em',color:'#C9A870',textTransform:'uppercase',marginBottom:14}}>Import Contacts</div>
           <div style={{fontSize:11,color:'rgba(246,241,233,0.45)',fontFamily:'Inter',marginBottom:14,lineHeight:1.7}}>
-            Import contacts from a spreadsheet or phone export. Download the template, fill it in, and import it here.
+            Import from a spreadsheet or phone export. Download the template, fill it in, and import.
           </div>
           <button onClick={e=>{e.stopPropagation();downloadTemplate();}} style={{width:'100%',padding:'10px',background:'rgba(92,143,181,0.15)',border:'1px solid rgba(92,143,181,0.35)',borderRadius:8,color:'#C4D9EE',fontFamily:'Inter',fontSize:12,fontWeight:500,cursor:'pointer',marginBottom:8,letterSpacing:'0.06em'}}>
             ↓ Download CSV template
@@ -832,11 +799,10 @@ function InfoPanel({onClose,onExport,onImport,onImportCSV,lastExport}){
           <button onClick={e=>{e.stopPropagation();csvRef.current.click();}} style={{width:'100%',padding:'10px',background:'transparent',border:'1px solid rgba(92,143,181,0.25)',borderRadius:8,color:'rgba(196,217,238,0.5)',fontFamily:'Inter',fontSize:12,cursor:'pointer',letterSpacing:'0.06em',marginBottom:20}}>
             ↑ Import from CSV
           </button>
-
           <div style={{borderTop:'1px solid rgba(201,168,112,0.15)',paddingTop:20}}>
             <div style={{fontFamily:'Inter',fontSize:9,letterSpacing:'0.18em',color:'#C9A870',textTransform:'uppercase',marginBottom:12}}>Customization</div>
             <div style={{fontSize:11,color:'rgba(246,241,233,0.45)',fontFamily:'Inter',lineHeight:1.7}}>
-              This app was built with Claude at claude.ai. Take your index.html to Claude and describe any changes you want — colors, fields, features. No coding required.
+              Built with Claude at claude.ai. Take your index.html to Claude and describe any changes — colors, fields, features. No coding required.
             </div>
           </div>
         </div>
@@ -865,18 +831,12 @@ function App(){
   useEffect(()=>{
     const t1=setTimeout(()=>setIp('fading'),4500);
     const t2=setTimeout(()=>setIp('done'),5300);
-    loadContacts().then(saved => {
-      setContacts((saved||DEFAULTS).map(migrateContact));
-    });
+    loadContacts().then(saved=>{setContacts((saved||DEFAULTS).map(migrateContact));});
     return()=>{clearTimeout(t1);clearTimeout(t2);};
   },[]);
 
   const persist=next=>{setContacts(next);saveContacts(next);};
-  const handleNav=k=>{
-    setNav(k);
-    if(k==='home'){setScreen('dashboard');}
-    else{setFf(k==='all'?null:k);setScreen('list');}
-  };
+  const handleNav=k=>{setNav(k);if(k==='home'){setScreen('dashboard');}else{setFf(k==='all'?null:k);setScreen('list');}};
   const openContact=id=>{setPrev(screen);setSid(id);setScreen('detail');};
   const quickLog=id=>{
     const c=contacts.find(x=>x.id===id);if(!c)return;
@@ -889,12 +849,10 @@ function App(){
     const exists=contacts.some(c=>c.id===data.id);
     persist(exists?contacts.map(c=>c.id===data.id?data:c):[...contacts,data]);
   };
-  const deleteContact=id=>{
-    persist(contacts.filter(c=>c.id!==id));
-    setScreen(prev==='detail'?'dashboard':prev);setNav('home');
-  };
+  const deleteContact=id=>{persist(contacts.filter(c=>c.id!==id));setScreen(prev==='detail'?'dashboard':prev);setNav('home');};
   const showToast=msg=>{setToast(msg);setTimeout(()=>setToast(null),3000);};
   const toggleDark=()=>{const nd=!dark;setDark(nd);localStorage.setItem('sc-dark',nd?'1':'0');};
+
   const doExport=()=>{
     const blob=new Blob([JSON.stringify(contacts,null,2)],{type:'application/json'});
     const url=URL.createObjectURL(blob);
@@ -905,48 +863,8 @@ function App(){
     const d=todayStr();localStorage.setItem('sc-last-export',d);setLastExport(d);
     showToast('✓ Contacts exported');
   };
-  const doImportCSV=file=>{
-    if(!file)return;
-    const r=new FileReader();
-    r.onload=ev=>{
-      try{
-        const text=ev.target.result;
-        const lines=text.trim().split('\n');
-        if(lines.length<2){showToast('No contacts found in CSV');return;}
-        const headers=lines[0].split(',').map(h=>h.trim().toLowerCase().replace(/[^a-z ]/g,'').trim());
-        const idx=h=>headers.findIndex(x=>x.includes(h));
-        const fi=idx('first'),li=idx('last'),pi=idx('phone'),ei=idx('email'),
-              si=idx('source'),ni=idx('notes'),fri=idx('freq'),sti=idx('status'),
-              bi=idx('birthday'),ci=idx('conversation')||idx('starter');
-        const newContacts=lines.slice(1).filter(l=>l.trim()).map(line=>{
-          const cols=line.split(',').map(c=>c.trim().replace(/^"|"$/g,''));
-          const get=i=>i>=0&&cols[i]?cols[i]:'';
-          const rawFreq=get(fri).toLowerCase();
-          const rawStatus=get(sti).toLowerCase();
-          const freqMap={weekly:'weekly',monthly:'monthly',quarterly:'quarterly',annually:'annually',bespoke:'bespoke',weekly:'weekly'};
-          const statusMap={new:'new',nurturing:'nurturing',active:'active',legacy:'legacy'};
-          return{
-            id:uid(),fn:get(fi),ln:get(li),ph:get(pi),em:get(ei),
-            src:get(si)||'SOI',notes:get(ni),
-            freq:freqMap[rawFreq]||'monthly',
-            status:statusMap[rawStatus]||'new',
-            birthday:get(bi),starter:get(ci),
-            met:'',lc:'',meth:'',res:'',na:'',nad:'',bn:'',
-            log:[],addr1:'',city:'',state:'',zip:'',anniversaries:[]
-          };
-        }).filter(c=>c.fn||c.ln);
-        if(newContacts.length===0){showToast('No valid contacts found');return;}
-        const merged=[...contacts];
-        newContacts.forEach(nc=>{
-          if(!merged.find(e=>`${e.fn}${e.ln}`.toLowerCase()===`${nc.fn}${nc.ln}`.toLowerCase()))
-            merged.push(nc);
-        });
-        persist(merged);setInfoOpen(false);
-        showToast(`✓ ${newContacts.length} contacts imported from CSV`);
-      }catch(e){showToast('Could not read CSV file');}
-    };
-    r.readAsText(file);
-  };
+
+  const doImport=file=>{
     if(!file)return;
     const r=new FileReader();
     r.onload=ev=>{
@@ -958,8 +876,57 @@ function App(){
     };
     r.readAsText(file);
   };
+
+  const doImportCSV=file=>{
+    if(!file)return;
+    const r=new FileReader();
+    r.onload=ev=>{
+      try{
+        const lines=ev.target.result.trim().split('\n');
+        if(lines.length<2){showToast('No contacts found in CSV');return;}
+        const headers=lines[0].split(',').map(h=>h.trim().toLowerCase());
+        const fi=headers.findIndex(h=>h.includes('first'));
+        const li=headers.findIndex(h=>h.includes('last'));
+        const pi=headers.findIndex(h=>h.includes('phone'));
+        const ei=headers.findIndex(h=>h.includes('email'));
+        const si=headers.findIndex(h=>h.includes('source'));
+        const ni=headers.findIndex(h=>h.includes('notes'));
+        const fri=headers.findIndex(h=>h.includes('freq'));
+        const sti=headers.findIndex(h=>h.includes('status'));
+        const bi=headers.findIndex(h=>h.includes('birthday'));
+        const ci=headers.findIndex(h=>h.includes('conversation')||h.includes('starter'));
+        const get=(cols,i)=>i>=0&&cols[i]?cols[i].trim().replace(/^"|"$/g,''):'';
+        const freqMap={weekly:'weekly',monthly:'monthly',quarterly:'quarterly',annually:'annually',bespoke:'bespoke'};
+        const statusMap={new:'new',nurturing:'nurturing',active:'active',legacy:'legacy'};
+        const newContacts=lines.slice(1).filter(l=>l.trim()).map(line=>{
+          const cols=line.split(',');
+          const rawFreq=get(cols,fri).toLowerCase();
+          const rawStatus=get(cols,sti).toLowerCase();
+          return{
+            id:uid(),fn:get(cols,fi),ln:get(cols,li),ph:get(cols,pi),em:get(cols,ei),
+            src:get(cols,si)||'SOI',notes:get(cols,ni),
+            freq:freqMap[rawFreq]||'monthly',
+            status:statusMap[rawStatus]||'new',
+            birthday:get(cols,bi),starter:get(cols,ci),
+            met:'',lc:'',meth:'',res:'',na:'',nad:'',bn:'',
+            log:[],addr1:'',city:'',state:'',zip:'',anniversaries:[]
+          };
+        }).filter(c=>c.fn||c.ln);
+        if(newContacts.length===0){showToast('No valid contacts found');return;}
+        const merged=[...contacts];
+        newContacts.forEach(nc=>{
+          const exists=merged.find(e=>`${e.fn}${e.ln}`.toLowerCase()===`${nc.fn}${nc.ln}`.toLowerCase());
+          if(!exists)merged.push(nc);
+        });
+        persist(merged);setInfoOpen(false);
+        showToast(`✓ ${newContacts.length} contacts imported from CSV`);
+      }catch(err){showToast('Could not read CSV file');}
+    };
+    r.readAsText(file);
+  };
+
   const dismissReminder=()=>{localStorage.setItem('sc-export-dismissed',todayStr());setDismissed(true);};
-  const showReminder=!dismissed&&(!lastExport||(daysUntil(lastExport)||0)<-7);
+  const showReminder=!dismissed&&!USE_SB&&(!lastExport||(daysUntil(lastExport)||0)<-7);
   const sel=contacts.find(c=>c.id===sid);
 
   return(
