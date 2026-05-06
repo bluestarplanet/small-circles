@@ -258,9 +258,54 @@ const DEFAULTS=[
   mk('Kerry','Newman','(310) 804-9428','kerrylindsaynewman@yahoo.com','Open House','','','','Call'),
 ];
 
-const SK='sc-v4';
-const load=()=>{try{const d=localStorage.getItem(SK);return d?JSON.parse(d):null;}catch{return null;}};
-const save=d=>{try{localStorage.setItem(SK,JSON.stringify(d));}catch{}};
+// ── Supabase config ───────────────────────────────────────────────────────────
+// Paste your values from Supabase below. Leave as-is to use local storage only.
+const SB_URL = 'YOUR_SUPABASE_URL';         // e.g. https://xxxx.supabase.co
+const SB_KEY = 'YOUR_SUPABASE_PUBLISHABLE_KEY'; // e.g. sb_publishable_xxxx
+
+const useSupabase = SB_URL !== 'YOUR_SUPABASE_URL' && SB_KEY !== 'YOUR_SUPABASE_PUBLISHABLE_KEY';
+const SB_ROW_ID = 'sc-contacts';
+
+const sbLoad = async () => {
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/contacts?id=eq.${SB_ROW_ID}&select=data`, {
+      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }
+    });
+    const rows = await res.json();
+    if (rows && rows.length > 0 && rows[0].data) return rows[0].data;
+    return null;
+  } catch { return null; }
+};
+
+const sbSave = async (contacts) => {
+  try {
+    await fetch(`${SB_URL}/rest/v1/contacts`, {
+      method: 'POST',
+      headers: {
+        apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`,
+        'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify({ id: SB_ROW_ID, data: contacts, updated_at: new Date().toISOString() })
+    });
+  } catch {}
+};
+
+const SK = 'sc-v4';
+const lsLoad = () => { try { const d = localStorage.getItem(SK); return d ? JSON.parse(d) : null; } catch { return null; } };
+const lsSave = d => { try { localStorage.setItem(SK, JSON.stringify(d)); } catch {} };
+
+const loadContacts = async () => {
+  if (useSupabase) {
+    const d = await sbLoad();
+    if (d) return d;
+  }
+  return lsLoad();
+};
+
+const saveContacts = async (contacts) => {
+  lsSave(contacts); // always save locally as backup
+  if (useSupabase) await sbSave(contacts);
+};
 
 function Pulsar({size=80,color='#C9A870',animate=false,onClick}){
   const cx=80,cy=80,outer=52,circles=[22,36,52],lens=[22,16,11];
@@ -788,13 +833,13 @@ function App(){
   useEffect(()=>{
     const t1=setTimeout(()=>setIp('fading'),4500);
     const t2=setTimeout(()=>setIp('done'),5300);
-    const saved=load();
-    const raw=saved||DEFAULTS;
-    setContacts(raw.map(migrateContact));
+    loadContacts().then(saved => {
+      setContacts((saved||DEFAULTS).map(migrateContact));
+    });
     return()=>{clearTimeout(t1);clearTimeout(t2);};
   },[]);
 
-  const persist=next=>{setContacts(next);save(next);};
+  const persist=next=>{setContacts(next);saveContacts(next);};
   const handleNav=k=>{
     setNav(k);
     if(k==='home'){setScreen('dashboard');}
