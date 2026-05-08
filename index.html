@@ -472,7 +472,7 @@ function CCard({c,onOpen,onQL,logged}){
     if(dd<0){nc='#B03030';nl=`${Math.abs(dd)}d overdue`;}
     else if(dd===0){nc='#B0607A';nl='Today';}
     else if(dd<=7){nc='#5C8FB5';nl=`in ${dd}d`;}
-    else{nc=th.tLt;nl=`in ${dd}d`;}
+    else{nc=th.tLt;nl=`in ${dd} days`;}
   }
   return(
     <div className="card" onClick={()=>onOpen(c.id)}>
