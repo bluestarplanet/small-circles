@@ -44,29 +44,12 @@ textarea{resize:vertical;min-height:72px;}
 const {useState,useEffect,useRef,createContext,useContext}=React;
 
 // ── Supabase config ───────────────────────────────────────────────────────────
-// Paste your values below. Leave as-is to use local storage only.
-const SB_URL='https://pltwmvfpdyusfboxcpwm.supabase.co';
-const SB_KEY='sb_publishable_znxBDxuBl_rDrHO2xxMxmA_fUuEha5n';
+const SB_URL='YOUR_SUPABASE_URL';
+const SB_KEY='YOUR_SUPABASE_PUBLISHABLE_KEY';
 const USE_SB=SB_URL!=='YOUR_SUPABASE_URL'&&SB_KEY!=='YOUR_SUPABASE_PUBLISHABLE_KEY';
 const SB_ROW='sc-contacts';
-
-const sbLoad=async()=>{
-  try{
-    const r=await fetch(`${SB_URL}/rest/v1/contacts?id=eq.${SB_ROW}&select=data`,{headers:{apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`}});
-    const rows=await r.json();
-    if(rows&&rows.length>0&&rows[0].data)return rows[0].data;
-    return null;
-  }catch{return null;}
-};
-const sbSave=async d=>{
-  try{
-    await fetch(`${SB_URL}/rest/v1/contacts`,{
-      method:'POST',
-      headers:{apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates'},
-      body:JSON.stringify({id:SB_ROW,data:d,updated_at:new Date().toISOString()})
-    });
-  }catch{}
-};
+const sbLoad=async()=>{try{const r=await fetch(`${SB_URL}/rest/v1/contacts?id=eq.${SB_ROW}&select=data`,{headers:{apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`}});const rows=await r.json();if(rows&&rows.length>0&&rows[0].data)return rows[0].data;return null;}catch{return null;}};
+const sbSave=async d=>{try{await fetch(`${SB_URL}/rest/v1/contacts`,{method:'POST',headers:{apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates'},body:JSON.stringify({id:SB_ROW,data:d,updated_at:new Date().toISOString()})});}catch{}};
 const SK='sc-v4';
 const lsLoad=()=>{try{const d=localStorage.getItem(SK);return d?JSON.parse(d):null;}catch{return null;}};
 const lsSave=d=>{try{localStorage.setItem(SK,JSON.stringify(d));}catch{}};
@@ -108,6 +91,7 @@ const FREQ={
 };
 const STATUS={
   new:      {key:'new',      label:'New',      desc:'A new connection'},
+  friend:   {key:'friend',   label:'Friend',   desc:'A personal connection'},
   nurturing:{key:'nurturing',label:'Nurturing',desc:'Building a relationship'},
   active:   {key:'active',   label:'Active',   desc:'In motion — priority contact'},
   legacy:   {key:'legacy',   label:'Legacy',   desc:'A valued past client'},
@@ -119,8 +103,10 @@ const FCOLOR={
   annually: {color:'#4E7C5A',bg:'#C0D4C4'},
   bespoke:  {color:'#6E6158',bg:'#D5CEC5'},
 };
+const METHODS=['Call','Text','Email','Letter','Drop By','Social','Lunch','Coffee','Other'];
 const SOURCES=['SOI','Open House','Referral','Social Media','Networking Event','Door Knocking','Farm','Other'];
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DAY_LABELS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
 // ── Utils ─────────────────────────────────────────────────────────────────────
 const todayStr=()=>new Date().toISOString().split('T')[0];
@@ -130,16 +116,11 @@ const fmtDate=str=>str?new Date(str+'T00:00:00').toLocaleDateString('en-US',{mon
 const uid=()=>Math.random().toString(36).slice(2,10);
 const parseBday=str=>{
   if(!str)return null;
-  if(str.includes('-')&&str.length>=8){
-    const p=str.split('-');
-    if(p.length===3){const now=new Date();const d=new Date(now.getFullYear(),parseInt(p[1])-1,parseInt(p[2]));if(d<new Date(now.getFullYear(),now.getMonth(),now.getDate()))d.setFullYear(now.getFullYear()+1);return d;}
-  }
-  const parts=str.trim().toLowerCase().split(/[\s,]+/);
-  if(parts.length<2)return null;
+  if(str.includes('-')&&str.length>=8){const p=str.split('-');if(p.length===3){const now=new Date();const d=new Date(now.getFullYear(),parseInt(p[1])-1,parseInt(p[2]));if(d<new Date(now.getFullYear(),now.getMonth(),now.getDate()))d.setFullYear(now.getFullYear()+1);return d;}}
+  const parts=str.trim().toLowerCase().split(/[\s,]+/);if(parts.length<2)return null;
   const mi=MONTHS.map(m=>m.toLowerCase()).indexOf(parts[0]);const day=parseInt(parts[1]);
   if(mi===-1||isNaN(day))return null;
-  const now=new Date();const d=new Date(now.getFullYear(),mi,day);
-  if(d<now)d.setFullYear(now.getFullYear()+1);return d;
+  const now=new Date();const d=new Date(now.getFullYear(),mi,day);if(d<now)d.setFullYear(now.getFullYear()+1);return d;
 };
 const fmtBday=str=>{
   if(!str)return'';
@@ -286,12 +267,8 @@ function Pulsar({size=80,color='#C9A870',animate=false,onClick}){
     <svg width={size} height={size} viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg"
       className={animate?'pa':''} onClick={onClick}
       style={{display:'block',overflow:'visible',cursor:onClick?'pointer':'default'}}>
-      {Array.from({length:12},(_,i)=>{
-        const a=((i*30-90)*Math.PI)/180,l=lens[i%3];
-        return <line key={i} x1={cx+Math.cos(a)*outer} y1={cy+Math.sin(a)*outer}
-          x2={cx+Math.cos(a)*(outer+l)} y2={cy+Math.sin(a)*(outer+l)}
-          stroke={color} strokeWidth="1.5" strokeLinecap="round" opacity="0.85"/>;
-      })}
+      {Array.from({length:12},(_,i)=>{const a=((i*30-90)*Math.PI)/180,l=lens[i%3];return <line key={i} x1={cx+Math.cos(a)*outer} y1={cy+Math.sin(a)*outer} x2={cx+Math.cos(a)*(outer+l)} y2={cy+Math.sin(a)*(outer+l)} stroke={color} strokeWidth="1.5" strokeLinecap="round" opacity="0.85"/>;})
+      }
       {circles.map((r,i)=><circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth="1.2" opacity={0.85-i*0.2}/>)}
       <circle cx={cx} cy={cy} r="4" fill={color}/>
     </svg>
@@ -300,8 +277,7 @@ function Pulsar({size=80,color='#C9A870',animate=false,onClick}){
 
 function Intro({phase}){
   return(
-    <div className={phase==='fading'?'iout':'iin'}
-      style={{position:'fixed',inset:0,background:'#16293D',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',zIndex:1000,gap:30}}>
+    <div className={phase==='fading'?'iout':'iin'} style={{position:'fixed',inset:0,background:'#16293D',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',zIndex:1000,gap:30}}>
       <Pulsar size={150} color="#C9A870" animate/>
       <div style={{textAlign:'center'}}>
         <div className="it" style={{fontFamily:'Cormorant Garamond',fontWeight:300,fontSize:30,letterSpacing:'0.2em',color:'#F6F1E9',textTransform:'uppercase'}}>Small Circles</div>
@@ -321,24 +297,12 @@ const Accent=({color,label})=>(
 const Fld=({label,children})=><div style={{marginBottom:18}}><span className="sl">{label}</span>{children}</div>;
 const Divider=()=>{
   const th=useTh();
-  return(
-    <div style={{display:'flex',justifyContent:'center',margin:'18px 0 28px'}}>
-      <div style={{width:'60%',borderTop:`1px solid ${th.bdr}`}}/>
-    </div>
-  );
+  return <div style={{display:'flex',justifyContent:'center',margin:'18px 0 28px'}}><div style={{width:'60%',borderTop:`1px solid ${th.bdr}`}}/></div>;
 };
 
 function TopNav({active,onNav}){
   const th=useTh();
-  const items=[
-    {key:'home',label:'Home'},
-    {key:'all',label:'All'},
-    {key:'weekly',label:'Weekly'},
-    {key:'monthly',label:'Monthly'},
-    {key:'quarterly',label:'Quarterly'},
-    {key:'annually',label:'Annually'},
-    {key:'bespoke',label:'Bespoke'},
-  ];
+  const items=[{key:'home',label:'Home'},{key:'all',label:'All'},{key:'weekly',label:'Weekly'},{key:'monthly',label:'Monthly'},{key:'quarterly',label:'Quarterly'},{key:'annually',label:'Annually'},{key:'bespoke',label:'Bespoke'}];
   return(
     <div style={{background:th.lHead,borderBottom:`1px solid ${th.bdr}`,display:'flex',flexShrink:0}}>
       {items.map(item=>{
@@ -349,7 +313,7 @@ function TopNav({active,onNav}){
           <button key={item.key} onClick={()=>onNav(item.key)}
             style={{flex:1,background:'transparent',border:'none',padding:'8px 2px 7px',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,borderBottom:isAct?`2px solid ${dot}`:'2px solid transparent',transition:'all 0.15s'}}>
             <div style={{width:5,height:5,borderRadius:'50%',background:isAct?dot:'transparent',border:isAct?'none':`1px solid ${th.bdr}`,transition:'all 0.15s'}}/>
-            <span style={{fontFamily:'Inter',fontSize:8,fontWeight:isAct?500:400,letterSpacing:'0.06em',color:isAct?dot:th.tLt,textTransform:'uppercase',transition:'color 0.15s'}}>{item.label}</span>
+            <span style={{fontFamily:'Inter',fontSize:9,fontWeight:isAct?500:400,letterSpacing:'0.06em',color:isAct?dot:th.tLt,textTransform:'uppercase',transition:'color 0.15s'}}>{item.label}</span>
           </button>
         );
       })}
@@ -364,7 +328,7 @@ function ConnectionSection({freq,status,onFreq,onStatus}){
       <span className="sl">Connection</span>
       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
         <span style={{fontFamily:'Inter',fontSize:9,fontWeight:500,letterSpacing:'0.1em',textTransform:'uppercase',color:th.tLt,minWidth:56,flexShrink:0}}>Status</span>
-        <div style={{display:'flex',gap:4}}>
+        <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
           {Object.values(STATUS).map(s=>(
             <button key={s.key} className="pill" onClick={()=>onStatus(s.key)}
               style={{color:status===s.key?'#243C58':th.tMed,background:status===s.key?'#C4D9EE':'transparent',borderColor:status===s.key?'#5C8FB5':th.pillBdr,width:60,textAlign:'center',padding:'4px 0',fontSize:10}}>{s.label}</button>
@@ -383,6 +347,24 @@ function ConnectionSection({freq,status,onFreq,onStatus}){
           })}
         </div>
       </div>
+    </div>
+  );
+}
+
+function MethodField({value,onChange}){
+  const th=useTh();
+  const [custom,setCustom]=useState(value&&!METHODS.includes(value)?value:'');
+  const isOther=value==='Other'||(!METHODS.includes(value)&&value);
+  const sel=isOther?'Other':(value||'');
+  return(
+    <div>
+      <select value={sel} onChange={e=>{if(e.target.value==='Other'){onChange('Other');}else{onChange(e.target.value);setCustom('');}}}>
+        <option value="">Method…</option>
+        {METHODS.map(m=><option key={m} value={m}>{m}</option>)}
+      </select>
+      {isOther&&(
+        <input placeholder="Describe the method…" value={custom} onChange={e=>{setCustom(e.target.value);onChange(e.target.value);}} style={{marginTop:8}}/>
+      )}
     </div>
   );
 }
@@ -462,6 +444,176 @@ function NotesLog({log,onUpdate}){
   );
 }
 
+// ── Calendar ──────────────────────────────────────────────────────────────────
+function MonthCalendar({contacts,onOpen}){
+  const th=useTh();
+  const [year,setYear]=useState(new Date().getFullYear());
+  const [month,setMonth]=useState(new Date().getMonth());
+  const [selected,setSelected]=useState(null);
+
+  const firstDay=new Date(year,month,1).getDay();
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  const today=new Date();
+  const todayKey=todayStr();
+
+  const byDate={};
+  contacts.forEach(c=>{
+    if(c.nad){
+      const d=new Date(c.nad+'T00:00:00');
+      if(d.getFullYear()===year&&d.getMonth()===month){
+        const day=d.getDate();
+        if(!byDate[day])byDate[day]=[];
+        byDate[day].push(c);
+      }
+    }
+  });
+
+  const prevMonth=()=>{if(month===0){setMonth(11);setYear(y=>y-1);}else setMonth(m=>m-1);setSelected(null);};
+  const nextMonth=()=>{if(month===11){setMonth(0);setYear(y=>y+1);}else setMonth(m=>m+1);setSelected(null);};
+  const monthName=new Date(year,month,1).toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  const selContacts=selected?byDate[selected]||[]:[];
+
+  const cells=[];
+  for(let i=0;i<firstDay;i++)cells.push(null);
+  for(let d=1;d<=daysInMonth;d++)cells.push(d);
+
+  return(
+    <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+      <div style={{padding:'12px 16px 10px',background:th.lHead,borderBottom:`1px solid ${th.bdr}`,flexShrink:0}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <button onClick={prevMonth} style={{background:'transparent',border:`1px solid ${th.bdr}`,borderRadius:6,width:28,height:28,cursor:'pointer',color:th.tMed,fontSize:16,display:'flex',alignItems:'center',justifyContent:'center'}}>‹</button>
+          <span style={{fontFamily:'Cormorant Garamond',fontSize:20,fontWeight:400,color:th.text}}>{monthName}</span>
+          <button onClick={nextMonth} style={{background:'transparent',border:`1px solid ${th.bdr}`,borderRadius:6,width:28,height:28,cursor:'pointer',color:th.tMed,fontSize:16,display:'flex',alignItems:'center',justifyContent:'center'}}>›</button>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',marginTop:10,gap:2}}>
+          {DAY_LABELS.map(d=><div key={d} style={{textAlign:'center',fontFamily:'Inter',fontSize:9,fontWeight:500,letterSpacing:'0.1em',color:th.tLt,textTransform:'uppercase',padding:'4px 0'}}>{d}</div>)}
+        </div>
+      </div>
+      <div style={{flex:1,overflowY:'auto',padding:'8px 12px 80px',background:th.bg}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:3,marginBottom:16}}>
+          {cells.map((d,i)=>{
+            if(!d)return <div key={`e${i}`}/>;
+            const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            const isToday=dateStr===todayKey;
+            const contacts=byDate[d]||[];
+            const isSel=selected===d;
+            const dot=contacts.length>0?(contacts.length===1?FCOLOR[contacts[0].freq]?.color||'#9E9288':'#9E9288'):null;
+            return(
+              <div key={d} onClick={()=>setSelected(isSel?null:d)}
+                style={{borderRadius:8,padding:'6px 4px',textAlign:'center',cursor:contacts.length>0?'pointer':'default',background:isSel?'rgba(92,143,181,0.15)':(isToday?'rgba(201,168,112,0.12)':'transparent'),border:isToday?`1px solid rgba(201,168,112,0.35)`:`1px solid transparent`,transition:'background 0.15s'}}>
+                <div style={{fontFamily:'Inter',fontSize:12,fontWeight:isToday?600:400,color:isToday?'#A87C38':th.text,marginBottom:3}}>{d}</div>
+                {dot&&<div style={{width:6,height:6,borderRadius:'50%',background:dot,margin:'0 auto'}}/>}
+                {contacts.length>1&&<div style={{fontSize:8,color:th.tLt,marginTop:2}}>{contacts.length}</div>}
+              </div>
+            );
+          })}
+        </div>
+        {selected&&selContacts.length>0&&(
+          <div>
+            <div style={{fontFamily:'Inter',fontSize:9,fontWeight:500,letterSpacing:'0.12em',textTransform:'uppercase',color:th.tLt,marginBottom:10}}>
+              {new Date(year,month,selected).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}
+            </div>
+            {selContacts.map(c=>{
+              const fc=FCOLOR[c.freq]||FCOLOR.monthly;
+              const st=STATUS[c.status];
+              return(
+                <div key={c.id} className="card" onClick={()=>onOpen(c.id)} style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <div>
+                    <div style={{fontFamily:'Cormorant Garamond',fontSize:18,fontWeight:400,color:th.text}}>{c.fn} {c.ln}</div>
+                    {c.starter&&<div style={{fontFamily:'Cormorant Garamond',fontStyle:'italic',fontSize:13,color:th.tMed,marginTop:2}}>{c.starter}</div>}
+                    <div style={{display:'flex',gap:6,marginTop:4}}>
+                      {st&&<Bdg color={th.tMed} bg={th.noteBg}>{st.label}</Bdg>}
+                      {fc&&<Bdg color={fc.color} bg={fc.bg}>{FREQ[c.freq]?.label}</Bdg>}
+                    </div>
+                  </div>
+                  {c.na&&<span style={{fontSize:11,color:th.tLt,fontStyle:'italic',flexShrink:0,marginLeft:8}}>{c.na}</span>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {selected&&selContacts.length===0&&(
+          <div style={{textAlign:'center',padding:'20px 0',fontFamily:'Cormorant Garamond',fontSize:18,fontStyle:'italic',color:th.tLt}}>No contacts scheduled for this day</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Weekly View ───────────────────────────────────────────────────────────────
+function WeekView({contacts,onOpen,onQL,logged}){
+  const th=useTh();
+  const [weekStart,setWeekStart]=useState(()=>{
+    const d=new Date();d.setHours(0,0,0,0);
+    const day=d.getDay();d.setDate(d.getDate()-day);return d;
+  });
+  const days=Array.from({length:7},(_,i)=>{
+    const d=new Date(weekStart);d.setDate(weekStart.getDate()+i);return d;
+  });
+  const fmt=d=>d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  const dStr=d=>d.toISOString().split('T')[0];
+  const todayKey=todayStr();
+  const prevWeek=()=>{const d=new Date(weekStart);d.setDate(d.getDate()-7);setWeekStart(d);};
+  const nextWeek=()=>{const d=new Date(weekStart);d.setDate(d.getDate()+7);setWeekStart(d);};
+  const weekLabel=`${days[0].toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${days[6].toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`;
+
+  return(
+    <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+      <div style={{padding:'12px 16px 10px',background:th.lHead,borderBottom:`1px solid ${th.bdr}`,flexShrink:0}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <button onClick={prevWeek} style={{background:'transparent',border:`1px solid ${th.bdr}`,borderRadius:6,width:28,height:28,cursor:'pointer',color:th.tMed,fontSize:16,display:'flex',alignItems:'center',justifyContent:'center'}}>‹</button>
+          <span style={{fontFamily:'Cormorant Garamond',fontSize:18,fontWeight:400,color:th.text}}>{weekLabel}</span>
+          <button onClick={nextWeek} style={{background:'transparent',border:`1px solid ${th.bdr}`,borderRadius:6,width:28,height:28,cursor:'pointer',color:th.tMed,fontSize:16,display:'flex',alignItems:'center',justifyContent:'center'}}>›</button>
+        </div>
+      </div>
+      <div style={{flex:1,overflowY:'auto',padding:'12px 14px 80px',background:th.bg}}>
+        {days.map(day=>{
+          const ds=dStr(day);
+          const dayContacts=contacts.filter(c=>c.nad===ds).sort((a,b)=>`${a.ln}${a.fn}`.localeCompare(`${b.ln}${b.fn}`));
+          const isToday=ds===todayKey;
+          return(
+            <div key={ds} style={{marginBottom:18}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+                <div style={{width:3,height:14,borderRadius:2,background:isToday?'#B0607A':th.bdr,flexShrink:0}}/>
+                <span style={{fontFamily:'Inter',fontSize:10,fontWeight:500,letterSpacing:'0.1em',textTransform:'uppercase',color:isToday?'#B0607A':th.tLt}}>
+                  {day.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})}
+                  {isToday&&' — Today'}
+                </span>
+              </div>
+              {dayContacts.length===0
+                ?<div style={{fontSize:12,color:th.tLt,fontStyle:'italic',paddingLeft:11,opacity:0.5}}>Nothing scheduled</div>
+                :dayContacts.map(c=>{
+                  const fc=FCOLOR[c.freq]||FCOLOR.monthly;
+                  const st=STATUS[c.status];
+                  return(
+                    <div key={c.id} className="card" onClick={()=>onOpen(c.id)}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8,marginBottom:4}}>
+                        <span style={{fontFamily:'Cormorant Garamond',fontSize:19,fontWeight:400,color:th.text}}>{c.fn} {c.ln}</span>
+                        <div style={{display:'flex',gap:4,flexShrink:0}}>
+                          {st&&<Bdg color={th.tMed} bg={th.noteBg}>{st.label}</Bdg>}
+                          {fc&&<Bdg color={fc.color} bg={fc.bg}>{FREQ[c.freq]?.label}</Bdg>}
+                        </div>
+                      </div>
+                      {c.starter&&<div style={{fontFamily:'Cormorant Garamond',fontStyle:'italic',fontSize:13,color:th.tMed,marginBottom:5}}>{c.starter}</div>}
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                        <span style={{fontSize:11,color:th.tMed}}>{c.na||''}</span>
+                        <button className={`ql${logged[c.id]?' done':''}`} onClick={e=>{e.stopPropagation();onQL(c.id);}}>
+                          {logged[c.id]?'✓ Logged':'Quick Log'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              }
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── CCard ─────────────────────────────────────────────────────────────────────
 function CCard({c,onOpen,onQL,logged}){
   const th=useTh();
   const fc=FCOLOR[c.freq]||FCOLOR.monthly;
@@ -471,7 +623,7 @@ function CCard({c,onOpen,onQL,logged}){
   if(c.nad){
     if(dd<0){nc='#B03030';nl=`${Math.abs(dd)}d overdue`;}
     else if(dd===0){nc='#B0607A';nl='Today';}
-    else if(dd<=7){nc='#5C8FB5';nl=`in ${dd}d`;}
+    else if(dd<=7){nc='#5C8FB5';nl=`in ${dd} days`;}
     else{nc=th.tLt;nl=`in ${dd} days`;}
   }
   return(
@@ -498,6 +650,154 @@ function CCard({c,onOpen,onQL,logged}){
   );
 }
 
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+function Dashboard({contacts,onOpen,onQL,logged,onInfo,onAdd,onUnsched,showReminder,lastExport,onExport,onDismiss,onToggleDark,view,onViewChange}){
+  const th=useTh();
+  const t=todayStr();
+  const overdue=contacts.filter(c=>c.nad&&c.nad<t).sort((a,b)=>a.nad.localeCompare(b.nad));
+  const today=contacts.filter(c=>c.nad===t);
+  const week=contacts.filter(c=>c.nad&&c.nad>t&&daysUntil(c.nad)<=7).sort((a,b)=>a.nad.localeCompare(b.nad));
+  const unsched=contacts.filter(c=>!c.nad);
+  const bdays=contacts.filter(c=>bdayIn14(c.birthday)).sort((a,b)=>(bdayDays(a.birthday)||99)-(bdayDays(b.birthday)||99));
+  const empty=overdue.length===0&&today.length===0&&week.length===0;
+  const dl=new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  const daysSince=lastExport?Math.abs(daysUntil(lastExport)):null;
+
+  return(
+    <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+      <div style={{background:th.hdr,padding:'18px 20px 14px',flexShrink:0}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+          <div>
+            <div style={{fontFamily:'Inter',fontSize:8.5,fontWeight:500,letterSpacing:'0.22em',color:'#C9A870',textTransform:'uppercase',marginBottom:5}}>Small Circles</div>
+            <div style={{fontFamily:'Cormorant Garamond',fontSize:20,fontWeight:300,color:'#F6F1E9'}}>{dl}</div>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <button onClick={onAdd} style={{background:'rgba(201,168,112,0.15)',border:'1px solid rgba(201,168,112,0.3)',borderRadius:'50%',width:30,height:30,cursor:'pointer',color:'#C9A870',fontSize:20,display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
+            <Pulsar size={46} color="#C9A870" onClick={onToggleDark}/>
+          </div>
+        </div>
+        <div style={{display:'flex',gap:10,marginTop:16}}>
+          {[{n:today.length,label:'Today',bg:'rgba(176,96,122,0.18)',c:'#EECDD6'},{n:week.length,label:'This Week',bg:'rgba(92,143,181,0.18)',c:'#C4D9EE'},{n:unsched.length,label:'Unscheduled',bg:'rgba(255,255,255,0.06)',c:'#D5CEC5'}].map(x=>(
+            <div key={x.label} className="tile" style={{background:x.bg}}>
+              <div style={{fontFamily:'Cormorant Garamond',fontSize:28,fontWeight:300,color:x.c}}>{x.n}</div>
+              <div style={{fontFamily:'Inter',fontSize:9,letterSpacing:'0.12em',color:x.c,opacity:0.65,textTransform:'uppercase',marginTop:2}}>{x.label}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{display:'flex',gap:4,marginTop:14,justifyContent:'center'}}>
+          {['daily','weekly','monthly'].map(v=>(
+            <button key={v} onClick={()=>onViewChange(v)}
+              style={{background:view===v?'rgba(201,168,112,0.2)':'transparent',border:`1px solid ${view===v?'rgba(201,168,112,0.5)':'rgba(201,168,112,0.15)'}`,borderRadius:20,padding:'4px 14px',cursor:'pointer',fontFamily:'Inter',fontSize:9,fontWeight:500,letterSpacing:'0.1em',color:view===v?'#C9A870':'rgba(201,168,112,0.4)',textTransform:'uppercase',transition:'all 0.15s'}}>
+              {v}
+            </button>
+          ))}
+        </div>
+      </div>
+      {showReminder&&(
+        <div style={{background:'rgba(168,124,56,0.12)',borderBottom:'1px solid rgba(168,124,56,0.25)',padding:'10px 16px',display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
+          <span style={{fontSize:12,color:'#A87C38',flex:1,fontFamily:'Inter'}}>{lastExport?`Last backup: ${daysSince} days ago.`:'Contacts not yet backed up.'} Export now?</span>
+          <button onClick={e=>{e.stopPropagation();onExport();onDismiss();}} style={{background:'#A87C38',color:'#F6F1E9',border:'none',borderRadius:6,padding:'4px 12px',fontSize:11,cursor:'pointer',fontFamily:'Inter',fontWeight:500,whiteSpace:'nowrap'}}>Export</button>
+          <button onClick={onDismiss} style={{background:'transparent',border:'none',color:'#A87C38',fontSize:16,cursor:'pointer',opacity:0.6,padding:'0 2px',lineHeight:1}}>×</button>
+        </div>
+      )}
+
+      {view==='weekly'&&<WeekView contacts={contacts} onOpen={onOpen} onQL={onQL} logged={logged}/>}
+      {view==='monthly'&&<MonthCalendar contacts={contacts} onOpen={onOpen}/>}
+      {view==='daily'&&(
+        <div style={{flex:1,overflowY:'auto',padding:'18px 14px 80px',background:th.bg}}>
+          {empty&&bdays.length===0&&(
+            <div style={{textAlign:'center',paddingTop:70}}>
+              <Pulsar size={70} color="#C5B59A"/>
+              <div style={{fontFamily:'Cormorant Garamond',fontSize:26,fontWeight:300,color:th.tLt,marginTop:18,letterSpacing:'0.05em'}}>You're clear.</div>
+            </div>
+          )}
+          {overdue.length>0&&<div style={{marginBottom:22}}><Accent color="#B03030" label="Overdue"/>{overdue.map(c=><CCard key={c.id} c={c} onOpen={onOpen} onQL={onQL} logged={!!logged[c.id]}/>)}</div>}
+          {today.length>0&&<div style={{marginBottom:22}}><Accent color="#B0607A" label="Today"/>{today.map(c=><CCard key={c.id} c={c} onOpen={onOpen} onQL={onQL} logged={!!logged[c.id]}/>)}</div>}
+          {week.length>0&&<div style={{marginBottom:22}}><Accent color="#5C8FB5" label="This Week"/>{week.map(c=><CCard key={c.id} c={c} onOpen={onOpen} onQL={onQL} logged={!!logged[c.id]}/>)}</div>}
+          {bdays.length>0&&(
+            <div style={{marginBottom:22}}>
+              <Accent color="#A87C38" label="Upcoming Birthdays"/>
+              {bdays.map(c=>(
+                <div key={c.id} className="card" onClick={()=>onOpen(c.id)} style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <div>
+                    <span style={{fontFamily:'Cormorant Garamond',fontSize:18,fontWeight:400,color:th.text}}>{c.fn} {c.ln}</span>
+                    {c.birthday&&<span style={{fontSize:12,color:'#A87C38',marginLeft:10}}>{fmtBday(c.birthday)}</span>}
+                  </div>
+                  <span style={{fontSize:11,color:'#A87C38',fontWeight:500}}>{bdayDays(c.birthday)===0?'Today 🎂':`in ${bdayDays(c.birthday)}d`}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {unsched.length>0&&(
+            <div style={{borderTop:`1px solid ${th.bdr}`,paddingTop:18,marginTop:6}}>
+              <div className="card" onClick={onUnsched} style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <span style={{fontFamily:'Cormorant Garamond',fontSize:17,fontStyle:'italic',color:th.tMed}}>{unsched.length} contact{unsched.length!==1?'s':''} unscheduled</span>
+                <span style={{color:th.tLt,fontSize:20}}>›</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div style={{padding:'10px 20px',background:th.lHead,borderTop:`1px solid ${th.bdr}`,display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
+        <button onClick={onInfo} style={{background:'transparent',border:`1px solid ${th.pillBdr}`,borderRadius:'50%',width:28,height:28,cursor:'pointer',color:th.tLt,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',fontStyle:'italic',fontFamily:'serif',fontWeight:'bold'}}>i</button>
+        <div style={{fontFamily:'Inter',fontSize:9,color:th.tLt,letterSpacing:'0.1em',textTransform:'uppercase',opacity:0.5}}>
+          {USE_SB?'Syncing to cloud':(lastExport?`Backed up ${Math.abs(daysUntil(lastExport))} days ago`:'Not yet backed up')}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── List ──────────────────────────────────────────────────────────────────────
+function List({contacts,freqFilter,onOpen,onQL,logged,onAdd}){
+  const th=useTh();
+  const [search,setSearch]=useState('');
+  const [sf,setSf]=useState(null);
+  const title=freqFilter==='unscheduled'?'Unscheduled':freqFilter?FREQ[freqFilter]?.label:'All Contacts';
+  const fc=freqFilter?FCOLOR[freqFilter]:null;
+  const tc=fc?fc.color:th.text;
+  const list=contacts
+    .filter(c=>freqFilter==='unscheduled'?!c.nad:freqFilter?c.freq===freqFilter:true)
+    .filter(c=>sf?c.status===sf:true)
+    .filter(c=>{
+      if(!search)return true;const q=search.toLowerCase();
+      return `${c.fn} ${c.ln}`.toLowerCase().includes(q)||(c.ph&&c.ph.includes(q))||(c.notes&&c.notes.toLowerCase().includes(q))||(c.starter&&c.starter.toLowerCase().includes(q));
+    })
+    .sort((a,b)=>{
+      if(a.nad&&b.nad)return a.nad.localeCompare(b.nad);
+      if(a.nad)return -1;if(b.nad)return 1;
+      return `${a.ln}${a.fn}`.localeCompare(`${b.ln}${b.fn}`);
+    });
+  return(
+    <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+      <div style={{background:th.lHead,borderBottom:`1px solid ${th.bdr}`,flexShrink:0,padding:'14px 16px 10px'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:12}}>
+          <div>
+            <div style={{fontFamily:'Cormorant Garamond',fontSize:22,fontWeight:400,color:tc}}>{title}</div>
+            <div style={{fontFamily:'Inter',fontSize:10.5,color:th.tLt,marginTop:2}}>{list.length} contacts</div>
+          </div>
+          <button onClick={onAdd} style={{background:'#16293D',color:'#F6F1E9',border:'none',borderRadius:'50%',width:34,height:34,fontSize:20,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>+</button>
+        </div>
+        <input className="si" placeholder="Search name, notes, phone…" value={search} onChange={e=>setSearch(e.target.value)}/>
+        <div style={{display:'flex',gap:5,marginTop:10,overflowX:'auto',paddingBottom:2}}>
+          {[null,...Object.values(STATUS)].map(s=>(
+            <button key={s?.key||'all'} className="pill" onClick={()=>setSf(s?s.key:null)}
+              style={{color:sf===(s?.key||null)?'#243C58':th.tMed,background:sf===(s?.key||null)?'#C4D9EE':'transparent',borderColor:sf===(s?.key||null)?'#5C8FB5':th.pillBdr,fontSize:10,padding:'3px 10px'}}>
+              {s?s.label:'All'}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={{flex:1,overflowY:'auto',padding:'12px 14px 80px',background:th.bg}}>
+        {list.length===0&&<div style={{textAlign:'center',paddingTop:60,fontFamily:'Cormorant Garamond',fontSize:20,fontStyle:'italic',color:th.tLt}}>No contacts found</div>}
+        {list.map(c=><CCard key={c.id} c={c} onOpen={onOpen} onQL={onQL} logged={!!logged[c.id]}/>)}
+      </div>
+    </div>
+  );
+}
+
+// ── ContactForm ───────────────────────────────────────────────────────────────
 function ContactForm({f,set,addrOpen,setAddrOpen}){
   const th=useTh();
   const hFreq=k=>{const days=FREQ[k]?.days;set('freq',k);if(days)set('nad',addDays(todayStr(),days));};
@@ -553,145 +853,14 @@ function ContactForm({f,set,addrOpen,setAddrOpen}){
       <Fld label="Scheduling">
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
           <input type="date" value={f.nad||''} onChange={e=>set('nad',e.target.value)}/>
-          <input placeholder="Method: call, drop by, send a note…" value={f.na||''} onChange={e=>set('na',e.target.value)}/>
+          <MethodField value={f.na||''} onChange={v=>set('na',v)}/>
         </div>
       </Fld>
     </>
   );
 }
 
-function Dashboard({contacts,onOpen,onQL,logged,onInfo,onAdd,onUnsched,showReminder,lastExport,onExport,onDismiss,onToggleDark}){
-  const th=useTh();
-  const t=todayStr();
-  const overdue=contacts.filter(c=>c.nad&&c.nad<t).sort((a,b)=>a.nad.localeCompare(b.nad));
-  const today=contacts.filter(c=>c.nad===t);
-  const week=contacts.filter(c=>c.nad&&c.nad>t&&daysUntil(c.nad)<=7).sort((a,b)=>a.nad.localeCompare(b.nad));
-  const unsched=contacts.filter(c=>!c.nad);
-  const bdays=contacts.filter(c=>bdayIn14(c.birthday)).sort((a,b)=>(bdayDays(a.birthday)||99)-(bdayDays(b.birthday)||99));
-  const empty=overdue.length===0&&today.length===0&&week.length===0;
-  const dl=new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
-  const daysSince=lastExport?Math.abs(daysUntil(lastExport)):null;
-  return(
-    <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-      <div style={{background:th.hdr,padding:'18px 20px 14px',flexShrink:0}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-          <div>
-            <div style={{fontFamily:'Inter',fontSize:8.5,fontWeight:500,letterSpacing:'0.22em',color:'#C9A870',textTransform:'uppercase',marginBottom:5}}>Small Circles</div>
-            <div style={{fontFamily:'Cormorant Garamond',fontSize:20,fontWeight:300,color:'#F6F1E9'}}>{dl}</div>
-          </div>
-          <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <button onClick={onAdd} style={{background:'rgba(201,168,112,0.15)',border:'1px solid rgba(201,168,112,0.3)',borderRadius:'50%',width:30,height:30,cursor:'pointer',color:'#C9A870',fontSize:20,display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
-            <Pulsar size={46} color="#C9A870" onClick={onToggleDark}/>
-          </div>
-        </div>
-        <div style={{display:'flex',gap:10,marginTop:16}}>
-          {[{n:today.length,label:'Today',bg:'rgba(176,96,122,0.18)',c:'#EECDD6'},{n:week.length,label:'This Week',bg:'rgba(92,143,181,0.18)',c:'#C4D9EE'},{n:unsched.length,label:'Unscheduled',bg:'rgba(255,255,255,0.06)',c:'#D5CEC5'}].map(x=>(
-            <div key={x.label} className="tile" style={{background:x.bg}}>
-              <div style={{fontFamily:'Cormorant Garamond',fontSize:28,fontWeight:300,color:x.c}}>{x.n}</div>
-              <div style={{fontFamily:'Inter',fontSize:9,letterSpacing:'0.12em',color:x.c,opacity:0.65,textTransform:'uppercase',marginTop:2}}>{x.label}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-      {showReminder&&(
-        <div style={{background:'rgba(168,124,56,0.12)',borderBottom:'1px solid rgba(168,124,56,0.25)',padding:'10px 16px',display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
-          <span style={{fontSize:12,color:'#A87C38',flex:1,fontFamily:'Inter'}}>
-            {lastExport?`Last backup: ${daysSince} days ago.`:'Contacts not yet backed up.'} Export now?
-          </span>
-          <button onClick={e=>{e.stopPropagation();onExport();onDismiss();}} style={{background:'#A87C38',color:'#F6F1E9',border:'none',borderRadius:6,padding:'4px 12px',fontSize:11,cursor:'pointer',fontFamily:'Inter',fontWeight:500,whiteSpace:'nowrap'}}>Export</button>
-          <button onClick={onDismiss} style={{background:'transparent',border:'none',color:'#A87C38',fontSize:16,cursor:'pointer',opacity:0.6,padding:'0 2px',lineHeight:1}}>×</button>
-        </div>
-      )}
-      <div style={{flex:1,overflowY:'auto',padding:'18px 14px 80px',background:th.bg}}>
-        {empty&&bdays.length===0&&(
-          <div style={{textAlign:'center',paddingTop:70}}>
-            <Pulsar size={70} color="#C5B59A"/>
-            <div style={{fontFamily:'Cormorant Garamond',fontSize:26,fontWeight:300,color:th.tLt,marginTop:18,letterSpacing:'0.05em'}}>You're clear.</div>
-          </div>
-        )}
-        {overdue.length>0&&<div style={{marginBottom:22}}><Accent color="#B03030" label="Overdue"/>{overdue.map(c=><CCard key={c.id} c={c} onOpen={onOpen} onQL={onQL} logged={!!logged[c.id]}/>)}</div>}
-        {today.length>0&&<div style={{marginBottom:22}}><Accent color="#B0607A" label="Today"/>{today.map(c=><CCard key={c.id} c={c} onOpen={onOpen} onQL={onQL} logged={!!logged[c.id]}/>)}</div>}
-        {week.length>0&&<div style={{marginBottom:22}}><Accent color="#5C8FB5" label="This Week"/>{week.map(c=><CCard key={c.id} c={c} onOpen={onOpen} onQL={onQL} logged={!!logged[c.id]}/>)}</div>}
-        {bdays.length>0&&(
-          <div style={{marginBottom:22}}>
-            <Accent color="#A87C38" label="Upcoming Birthdays"/>
-            {bdays.map(c=>(
-              <div key={c.id} className="card" onClick={()=>onOpen(c.id)} style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                <div>
-                  <span style={{fontFamily:'Cormorant Garamond',fontSize:18,fontWeight:400,color:th.text}}>{c.fn} {c.ln}</span>
-                  {c.birthday&&<span style={{fontSize:12,color:'#A87C38',marginLeft:10}}>{fmtBday(c.birthday)}</span>}
-                </div>
-                <span style={{fontSize:11,color:'#A87C38',fontWeight:500}}>{bdayDays(c.birthday)===0?'Today 🎂':`in ${bdayDays(c.birthday)}d`}</span>
-              </div>
-            ))}
-          </div>
-        )}
-        {unsched.length>0&&(
-          <div style={{borderTop:`1px solid ${th.bdr}`,paddingTop:18,marginTop:6}}>
-            <div className="card" onClick={onUnsched} style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-              <span style={{fontFamily:'Cormorant Garamond',fontSize:17,fontStyle:'italic',color:th.tMed}}>{unsched.length} contact{unsched.length!==1?'s':''} unscheduled</span>
-              <span style={{color:th.tLt,fontSize:20}}>›</span>
-            </div>
-          </div>
-        )}
-      </div>
-      <div style={{padding:'10px 20px',background:th.lHead,borderTop:`1px solid ${th.bdr}`,display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
-        <button onClick={onInfo} style={{background:'transparent',border:`1px solid ${th.pillBdr}`,borderRadius:'50%',width:28,height:28,cursor:'pointer',color:th.tLt,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',fontStyle:'italic',fontFamily:'serif',fontWeight:'bold'}}>i</button>
-        <div style={{fontFamily:'Inter',fontSize:9,color:th.tLt,letterSpacing:'0.1em',textTransform:'uppercase',opacity:0.5}}>
-          {USE_SB?'Syncing to cloud':(lastExport?`Backed up ${Math.abs(daysUntil(lastExport))} days ago`:'Not yet backed up')}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function List({contacts,freqFilter,onOpen,onQL,logged,onAdd}){
-  const th=useTh();
-  const [search,setSearch]=useState('');
-  const [sf,setSf]=useState(null);
-  const title=freqFilter==='unscheduled'?'Unscheduled':freqFilter?FREQ[freqFilter]?.label:'All Contacts';
-  const fc=freqFilter?FCOLOR[freqFilter]:null;
-  const tc=fc?fc.color:th.text;
-  const list=contacts
-    .filter(c=>freqFilter==='unscheduled'?!c.nad:freqFilter?c.freq===freqFilter:true)
-    .filter(c=>sf?c.status===sf:true)
-    .filter(c=>{
-      if(!search)return true;const q=search.toLowerCase();
-      return `${c.fn} ${c.ln}`.toLowerCase().includes(q)||(c.ph&&c.ph.includes(q))||(c.notes&&c.notes.toLowerCase().includes(q))||(c.starter&&c.starter.toLowerCase().includes(q));
-    })
-    .sort((a,b)=>{
-      if(a.nad&&b.nad)return a.nad.localeCompare(b.nad);
-      if(a.nad)return -1;if(b.nad)return 1;
-      return `${a.ln}${a.fn}`.localeCompare(`${b.ln}${b.fn}`);
-    });
-  return(
-    <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-      <div style={{background:th.lHead,borderBottom:`1px solid ${th.bdr}`,flexShrink:0,padding:'14px 16px 10px'}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:12}}>
-          <div>
-            <div style={{fontFamily:'Cormorant Garamond',fontSize:22,fontWeight:400,color:tc}}>{title}</div>
-            <div style={{fontFamily:'Inter',fontSize:10.5,color:th.tLt,marginTop:2}}>{list.length} contacts</div>
-          </div>
-          <button onClick={onAdd} style={{background:'#16293D',color:'#F6F1E9',border:'none',borderRadius:'50%',width:34,height:34,fontSize:20,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>+</button>
-        </div>
-        <input className="si" placeholder="Search name, notes, phone…" value={search} onChange={e=>setSearch(e.target.value)}/>
-        <div style={{display:'flex',gap:5,marginTop:10,overflowX:'auto',paddingBottom:2}}>
-          {[null,...Object.values(STATUS)].map(s=>(
-            <button key={s?.key||'all'} className="pill" onClick={()=>setSf(s?s.key:null)}
-              style={{color:sf===(s?.key||null)?'#243C58':th.tMed,background:sf===(s?.key||null)?'#C4D9EE':'transparent',borderColor:sf===(s?.key||null)?'#5C8FB5':th.pillBdr,fontSize:10,padding:'3px 10px'}}>
-              {s?s.label:'All'}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div style={{flex:1,overflowY:'auto',padding:'12px 14px 80px',background:th.bg}}>
-        {list.length===0&&<div style={{textAlign:'center',paddingTop:60,fontFamily:'Cormorant Garamond',fontSize:20,fontStyle:'italic',color:th.tLt}}>No contacts found</div>}
-        {list.map(c=><CCard key={c.id} c={c} onOpen={onOpen} onQL={onQL} logged={!!logged[c.id]}/>)}
-      </div>
-    </div>
-  );
-}
-
+// ── Detail ────────────────────────────────────────────────────────────────────
 function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
   const th=useTh();
   const [f,setF]=useState({addr1:'',city:'',state:'',zip:'',anniversaries:[],...contact});
@@ -736,6 +905,7 @@ function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
   );
 }
 
+// ── Add ───────────────────────────────────────────────────────────────────────
 function Add({onSave,onBack}){
   const th=useTh();
   const [f,setF]=useState({id:uid(),fn:'',ln:'',ph:'',em:'',src:'SOI',met:todayStr(),na:'',nad:'',bn:'',notes:'',freq:'monthly',status:'new',birthday:'',starter:'',log:[],addr1:'',city:'',state:'',zip:'',anniversaries:[]});
@@ -755,19 +925,18 @@ function Add({onSave,onBack}){
   );
 }
 
+// ── Info Panel ────────────────────────────────────────────────────────────────
 function InfoPanel({onClose,onExport,onImport,onImportCSV,lastExport}){
   const importRef=useRef();
   const csvRef=useRef();
   const daysSince=lastExport?Math.abs(daysUntil(lastExport)):null;
   const downloadTemplate=()=>{
-    const headers='First Name,Last Name,Phone,Email,Source,Notes,Frequency,Status,Birthday,Conversation Starter';
+    const h='First Name,Last Name,Phone,Email,Source,Notes,Frequency,Status,Birthday,Conversation Starter';
     const ex='Jane,Smith,(310) 555-0101,jane@email.com,SOI,Loves Brentwood. Two kids.,Monthly,Nurturing,June 12,Ask about her home search timeline';
-    const blob=new Blob([headers+'\n'+ex],{type:'text/csv'});
+    const blob=new Blob([h+'\n'+ex],{type:'text/csv'});
     const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=url;a.download='small-circles-template.csv';
-    document.body.appendChild(a);a.click();
-    document.body.removeChild(a);URL.revokeObjectURL(url);
+    const a=document.createElement('a');a.href=url;a.download='small-circles-template.csv';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
   };
   return(
     <div onClick={onClose} style={{position:'fixed',inset:0,background:'#16293D',zIndex:500,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:32,overflowY:'auto'}}>
@@ -777,33 +946,19 @@ function InfoPanel({onClose,onExport,onImport,onImportCSV,lastExport}){
         <div style={{textAlign:'left'}}>
           <div style={{fontFamily:'Inter',fontSize:9,letterSpacing:'0.18em',color:'#C9A870',textTransform:'uppercase',marginBottom:14}}>Data Backup</div>
           <div style={{fontSize:11,color:'rgba(246,241,233,0.45)',fontFamily:'Inter',marginBottom:16,lineHeight:1.7}}>
-            {USE_SB
-              ?`Syncing to Supabase — your contacts are safe across all devices.${lastExport?' Last exported '+daysSince+' days ago.':''}`
-              :(lastExport?`Last exported ${daysSince} days ago · ${fmtDate(lastExport)}`:'Never exported — contacts exist only in this browser.')+' Export weekly and keep the file in iCloud or Google Drive.'}
+            {USE_SB?`Syncing to Supabase — your contacts are safe across all devices.${lastExport?' Last exported '+daysSince+' days ago.':''}`:(lastExport?`Last exported ${daysSince} days ago · ${fmtDate(lastExport)}`:'Never exported — contacts exist only in this browser.')+' Export weekly and keep the file in iCloud or Google Drive.'}
           </div>
-          <button onClick={e=>{e.stopPropagation();onExport();}} style={{width:'100%',padding:'10px',background:'rgba(168,124,56,0.2)',border:'1px solid rgba(168,124,56,0.45)',borderRadius:8,color:'#C9A870',fontFamily:'Inter',fontSize:12,fontWeight:500,cursor:'pointer',marginBottom:8,letterSpacing:'0.06em'}}>
-            ↓ Export contacts (JSON)
-          </button>
+          <button onClick={e=>{e.stopPropagation();onExport();}} style={{width:'100%',padding:'10px',background:'rgba(168,124,56,0.2)',border:'1px solid rgba(168,124,56,0.45)',borderRadius:8,color:'#C9A870',fontFamily:'Inter',fontSize:12,fontWeight:500,cursor:'pointer',marginBottom:8,letterSpacing:'0.06em'}}>↓ Export contacts (JSON)</button>
           <input ref={importRef} type="file" accept=".json" style={{display:'none'}} onChange={e=>{onImport(e.target.files[0]);e.target.value='';}}/>
-          <button onClick={e=>{e.stopPropagation();importRef.current.click();}} style={{width:'100%',padding:'10px',background:'transparent',border:'1px solid rgba(201,168,112,0.2)',borderRadius:8,color:'rgba(246,241,233,0.45)',fontFamily:'Inter',fontSize:12,cursor:'pointer',letterSpacing:'0.06em',marginBottom:20}}>
-            ↑ Import backup (JSON)
-          </button>
+          <button onClick={e=>{e.stopPropagation();importRef.current.click();}} style={{width:'100%',padding:'10px',background:'transparent',border:'1px solid rgba(201,168,112,0.2)',borderRadius:8,color:'rgba(246,241,233,0.45)',fontFamily:'Inter',fontSize:12,cursor:'pointer',letterSpacing:'0.06em',marginBottom:20}}>↑ Import backup (JSON)</button>
           <div style={{fontFamily:'Inter',fontSize:9,letterSpacing:'0.18em',color:'#C9A870',textTransform:'uppercase',marginBottom:14}}>Import Contacts</div>
-          <div style={{fontSize:11,color:'rgba(246,241,233,0.45)',fontFamily:'Inter',marginBottom:14,lineHeight:1.7}}>
-            Import from a spreadsheet or phone export. Download the template, fill it in, and import.
-          </div>
-          <button onClick={e=>{e.stopPropagation();downloadTemplate();}} style={{width:'100%',padding:'10px',background:'rgba(92,143,181,0.15)',border:'1px solid rgba(92,143,181,0.35)',borderRadius:8,color:'#C4D9EE',fontFamily:'Inter',fontSize:12,fontWeight:500,cursor:'pointer',marginBottom:8,letterSpacing:'0.06em'}}>
-            ↓ Download CSV template
-          </button>
+          <div style={{fontSize:11,color:'rgba(246,241,233,0.45)',fontFamily:'Inter',marginBottom:14,lineHeight:1.7}}>Import from a spreadsheet or phone export. Download the template, fill it in, and import.</div>
+          <button onClick={e=>{e.stopPropagation();downloadTemplate();}} style={{width:'100%',padding:'10px',background:'rgba(92,143,181,0.15)',border:'1px solid rgba(92,143,181,0.35)',borderRadius:8,color:'#C4D9EE',fontFamily:'Inter',fontSize:12,fontWeight:500,cursor:'pointer',marginBottom:8,letterSpacing:'0.06em'}}>↓ Download CSV template</button>
           <input ref={csvRef} type="file" accept=".csv" style={{display:'none'}} onChange={e=>{onImportCSV(e.target.files[0]);e.target.value='';}}/>
-          <button onClick={e=>{e.stopPropagation();csvRef.current.click();}} style={{width:'100%',padding:'10px',background:'transparent',border:'1px solid rgba(92,143,181,0.25)',borderRadius:8,color:'rgba(196,217,238,0.5)',fontFamily:'Inter',fontSize:12,cursor:'pointer',letterSpacing:'0.06em',marginBottom:20}}>
-            ↑ Import from CSV
-          </button>
+          <button onClick={e=>{e.stopPropagation();csvRef.current.click();}} style={{width:'100%',padding:'10px',background:'transparent',border:'1px solid rgba(92,143,181,0.25)',borderRadius:8,color:'rgba(196,217,238,0.5)',fontFamily:'Inter',fontSize:12,cursor:'pointer',letterSpacing:'0.06em',marginBottom:20}}>↑ Import from CSV</button>
           <div style={{borderTop:'1px solid rgba(201,168,112,0.15)',paddingTop:20}}>
             <div style={{fontFamily:'Inter',fontSize:9,letterSpacing:'0.18em',color:'#C9A870',textTransform:'uppercase',marginBottom:12}}>Customization</div>
-            <div style={{fontSize:11,color:'rgba(246,241,233,0.45)',fontFamily:'Inter',lineHeight:1.7}}>
-              Built with Claude at claude.ai. Take your index.html to Claude and describe any changes — colors, fields, features. No coding required.
-            </div>
+            <div style={{fontSize:11,color:'rgba(246,241,233,0.45)',fontFamily:'Inter',lineHeight:1.7}}>Built with Claude at claude.ai. Take your index.html to Claude and describe any changes — colors, fields, features. No coding required.</div>
           </div>
         </div>
         <div style={{fontFamily:'Inter',fontSize:10,color:'rgba(201,168,112,0.3)',marginTop:28,letterSpacing:'0.1em'}} onClick={onClose}>Tap outside to dismiss</div>
@@ -812,6 +967,7 @@ function InfoPanel({onClose,onExport,onImport,onImportCSV,lastExport}){
   );
 }
 
+// ── App ───────────────────────────────────────────────────────────────────────
 function App(){
   const [ip,setIp]=useState('visible');
   const [dark,setDark]=useState(()=>localStorage.getItem('sc-dark')==='1');
@@ -826,6 +982,7 @@ function App(){
   const [lastExport,setLastExport]=useState(()=>localStorage.getItem('sc-last-export')||null);
   const [dismissed,setDismissed]=useState(()=>localStorage.getItem('sc-export-dismissed')===todayStr());
   const [toast,setToast]=useState(null);
+  const [dashView,setDashView]=useState('daily');
   const th=mkTh(dark);
 
   useEffect(()=>{
@@ -852,79 +1009,46 @@ function App(){
   const deleteContact=id=>{persist(contacts.filter(c=>c.id!==id));setScreen(prev==='detail'?'dashboard':prev);setNav('home');};
   const showToast=msg=>{setToast(msg);setTimeout(()=>setToast(null),3000);};
   const toggleDark=()=>{const nd=!dark;setDark(nd);localStorage.setItem('sc-dark',nd?'1':'0');};
-
   const doExport=()=>{
     const blob=new Blob([JSON.stringify(contacts,null,2)],{type:'application/json'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
+    const url=URL.createObjectURL(blob);const a=document.createElement('a');
     a.href=url;a.download=`small-circles-${todayStr()}.json`;
-    document.body.appendChild(a);a.click();
-    document.body.removeChild(a);URL.revokeObjectURL(url);
-    const d=todayStr();localStorage.setItem('sc-last-export',d);setLastExport(d);
-    showToast('✓ Contacts exported');
+    document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+    const d=todayStr();localStorage.setItem('sc-last-export',d);setLastExport(d);showToast('✓ Contacts exported');
   };
-
   const doImport=file=>{
-    if(!file)return;
-    const r=new FileReader();
-    r.onload=ev=>{
-      try{
-        const data=JSON.parse(ev.target.result);
-        if(Array.isArray(data)&&data.length>0){persist(data.map(migrateContact));setInfoOpen(false);showToast(`✓ ${data.length} contacts imported`);}
-        else showToast('No contacts found in file');
-      }catch{showToast('Invalid backup file');}
-    };
+    if(!file)return;const r=new FileReader();
+    r.onload=ev=>{try{const data=JSON.parse(ev.target.result);if(Array.isArray(data)&&data.length>0){persist(data.map(migrateContact));setInfoOpen(false);showToast(`✓ ${data.length} contacts imported`);}else showToast('No contacts found in file');}catch{showToast('Invalid backup file');}};
     r.readAsText(file);
   };
-
   const doImportCSV=file=>{
-    if(!file)return;
-    const r=new FileReader();
+    if(!file)return;const r=new FileReader();
     r.onload=ev=>{
       try{
-        const lines=ev.target.result.trim().split('\n');
-        if(lines.length<2){showToast('No contacts found in CSV');return;}
+        const lines=ev.target.result.trim().split('\n');if(lines.length<2){showToast('No contacts found in CSV');return;}
         const headers=lines[0].split(',').map(h=>h.trim().toLowerCase());
-        const fi=headers.findIndex(h=>h.includes('first'));
-        const li=headers.findIndex(h=>h.includes('last'));
-        const pi=headers.findIndex(h=>h.includes('phone'));
-        const ei=headers.findIndex(h=>h.includes('email'));
-        const si=headers.findIndex(h=>h.includes('source'));
-        const ni=headers.findIndex(h=>h.includes('notes'));
-        const fri=headers.findIndex(h=>h.includes('freq'));
-        const sti=headers.findIndex(h=>h.includes('status'));
-        const bi=headers.findIndex(h=>h.includes('birthday'));
-        const ci=headers.findIndex(h=>h.includes('conversation')||h.includes('starter'));
+        const fi=headers.findIndex(h=>h.includes('first')),li=headers.findIndex(h=>h.includes('last'));
+        const pi=headers.findIndex(h=>h.includes('phone')),ei=headers.findIndex(h=>h.includes('email'));
+        const si=headers.findIndex(h=>h.includes('source')),ni=headers.findIndex(h=>h.includes('notes'));
+        const fri=headers.findIndex(h=>h.includes('freq')),sti=headers.findIndex(h=>h.includes('status'));
+        const bi=headers.findIndex(h=>h.includes('birthday')),ci=headers.findIndex(h=>h.includes('conversation')||h.includes('starter'));
         const get=(cols,i)=>i>=0&&cols[i]?cols[i].trim().replace(/^"|"$/g,''):'';
         const freqMap={weekly:'weekly',monthly:'monthly',quarterly:'quarterly',annually:'annually',bespoke:'bespoke'};
-        const statusMap={new:'new',nurturing:'nurturing',active:'active',legacy:'legacy'};
+        const statusMap={new:'new',friend:'friend',nurturing:'nurturing',active:'active',legacy:'legacy'};
         const newContacts=lines.slice(1).filter(l=>l.trim()).map(line=>{
           const cols=line.split(',');
-          const rawFreq=get(cols,fri).toLowerCase();
-          const rawStatus=get(cols,sti).toLowerCase();
-          return{
-            id:uid(),fn:get(cols,fi),ln:get(cols,li),ph:get(cols,pi),em:get(cols,ei),
-            src:get(cols,si)||'SOI',notes:get(cols,ni),
-            freq:freqMap[rawFreq]||'monthly',
-            status:statusMap[rawStatus]||'new',
-            birthday:get(cols,bi),starter:get(cols,ci),
-            met:'',lc:'',meth:'',res:'',na:'',nad:'',bn:'',
-            log:[],addr1:'',city:'',state:'',zip:'',anniversaries:[]
-          };
+          return{id:uid(),fn:get(cols,fi),ln:get(cols,li),ph:get(cols,pi),em:get(cols,ei),src:get(cols,si)||'SOI',notes:get(cols,ni),
+            freq:freqMap[get(cols,fri).toLowerCase()]||'monthly',status:statusMap[get(cols,sti).toLowerCase()]||'new',
+            birthday:get(cols,bi),starter:get(cols,ci),met:'',lc:'',meth:'',res:'',na:'',nad:'',bn:'',log:[],addr1:'',city:'',state:'',zip:'',anniversaries:[]};
         }).filter(c=>c.fn||c.ln);
         if(newContacts.length===0){showToast('No valid contacts found');return;}
         const merged=[...contacts];
-        newContacts.forEach(nc=>{
-          const exists=merged.find(e=>`${e.fn}${e.ln}`.toLowerCase()===`${nc.fn}${nc.ln}`.toLowerCase());
-          if(!exists)merged.push(nc);
-        });
-        persist(merged);setInfoOpen(false);
-        showToast(`✓ ${newContacts.length} contacts imported from CSV`);
-      }catch(err){showToast('Could not read CSV file');}
+        newContacts.forEach(nc=>{if(!merged.find(e=>`${e.fn}${e.ln}`.toLowerCase()===`${nc.fn}${nc.ln}`.toLowerCase()))merged.push(nc);});
+        persist(merged);setInfoOpen(false);showToast(`✓ ${newContacts.length} contacts imported from CSV`);
+      }catch{showToast('Could not read CSV file');}
     };
     r.readAsText(file);
   };
-
   const dismissReminder=()=>{localStorage.setItem('sc-export-dismissed',todayStr());setDismissed(true);};
   const showReminder=!dismissed&&!USE_SB&&(!lastExport||(daysUntil(lastExport)||0)<-7);
   const sel=contacts.find(c=>c.id===sid);
@@ -946,18 +1070,14 @@ function App(){
             onInfo={()=>setInfoOpen(true)} onAdd={()=>{setPrev(screen);setScreen('add');}}
             onUnsched={()=>{setFf('unscheduled');setNav('all');setScreen('list');}}
             showReminder={showReminder} lastExport={lastExport} onExport={doExport} onDismiss={dismissReminder}
-            onToggleDark={toggleDark}/>
+            onToggleDark={toggleDark} view={dashView} onViewChange={setDashView}/>
         )}
         {screen==='list'&&(
           <List contacts={contacts} freqFilter={ff} onOpen={openContact} onQL={quickLog} logged={logged}
             onAdd={()=>{setPrev(screen);setScreen('add');}}/>
         )}
         {screen==='detail'&&sel&&(()=>{
-          const sorted=[...contacts].sort((a,b)=>{
-            if(a.nad&&b.nad)return a.nad.localeCompare(b.nad);
-            if(a.nad)return -1;if(b.nad)return 1;
-            return `${a.ln}${a.fn}`.localeCompare(`${b.ln}${b.fn}`);
-          });
+          const sorted=[...contacts].sort((a,b)=>{if(a.nad&&b.nad)return a.nad.localeCompare(b.nad);if(a.nad)return -1;if(b.nad)return 1;return `${a.ln}${a.fn}`.localeCompare(`${b.ln}${b.fn}`);});
           const idx=sorted.findIndex(c=>c.id===sel.id);
           const nc=sorted[idx+1],pc=sorted[idx-1];
           return <Detail key={sel.id} contact={sel} onSave={saveContact} onDelete={deleteContact}
