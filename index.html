@@ -44,8 +44,8 @@ textarea{resize:vertical;min-height:72px;}
 const {useState,useEffect,useRef,createContext,useContext}=React;
 
 // ── Supabase config ───────────────────────────────────────────────────────────
-const SB_URL='YOUR_SUPABASE_URL';
-const SB_KEY='YOUR_SUPABASE_PUBLISHABLE_KEY';
+const SB_URL='https://pltwmvfpdyusfboxcpwm.supabase.co';
+const SB_KEY='sb_publishable_znxBDxuBl_rDrHO2xxMxmA_fUuEha5n';
 const USE_SB=SB_URL!=='YOUR_SUPABASE_URL'&&SB_KEY!=='YOUR_SUPABASE_PUBLISHABLE_KEY';
 const SB_ROW='sc-contacts';
 const sbLoad=async()=>{try{const r=await fetch(`${SB_URL}/rest/v1/contacts?id=eq.${SB_ROW}&select=data`,{headers:{apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`}});const rows=await r.json();if(rows&&rows.length>0&&rows[0].data)return rows[0].data;return null;}catch{return null;}};
