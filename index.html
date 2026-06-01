@@ -133,6 +133,17 @@ const PERIODS=[
   {key:'ytd',    label:'Year to Date'},
   {key:'alltime',label:'All Time'},
 ];
+const getReachedContacts=(contacts,period)=>{
+  const today=todayStr();
+  const t=new Date(today+'T00:00:00');
+  let start=null;
+  if(period==='week'){const d=new Date(t);d.setDate(d.getDate()-d.getDay());start=d.toLocaleDateString('en-CA');}
+  else if(period==='month'){start=`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-01`;}
+  else if(period==='30days'){const d=new Date(t);d.setDate(d.getDate()-30);start=d.toLocaleDateString('en-CA');}
+  else if(period==='90days'){const d=new Date(t);d.setDate(d.getDate()-90);start=d.toLocaleDateString('en-CA');}
+  else if(period==='year'||period==='ytd'){start=`${t.getFullYear()}-01-01`;}
+  return contacts.filter(c=>c.lc&&(start?c.lc>=start&&c.lc<=today:true)).sort((a,b)=>b.lc.localeCompare(a.lc));
+};
 const countReached=(contacts,period)=>{
   const today=todayStr();
   const t=new Date(today+'T00:00:00');
@@ -713,6 +724,7 @@ function Dashboard({contacts,onOpen,onQL,logged,onInfo,onAdd,onUnsched,showRemin
   const unsched=contacts.filter(c=>!c.nad);
   const bdays=contacts.filter(c=>bdayIn14(c.birthday)).sort((a,b)=>(bdayDays(a.birthday)||99)-(bdayDays(b.birthday)||99));
   const empty=overdue.length===0&&today.length===0&&week.length===0;
+  const [reachedOpen,setReachedOpen]=useState(false);
   const dl=new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
   const daysSince=lastExport?Math.abs(daysUntil(lastExport)):null;
 
@@ -808,15 +820,56 @@ function Dashboard({contacts,onOpen,onQL,logged,onInfo,onAdd,onUnsched,showRemin
       <div style={{padding:'10px 20px',background:th.lHead,borderTop:`1px solid ${th.bdr}`,display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
         <button onClick={onInfo} style={{background:'transparent',border:`1px solid ${th.pillBdr}`,borderRadius:'50%',width:28,height:28,cursor:'pointer',color:th.tLt,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',fontStyle:'italic',fontFamily:'serif',fontWeight:'bold'}}>i</button>
         <div style={{display:'flex',alignItems:'center',gap:6}}>
-          <span style={{fontFamily:'Cormorant Garamond',fontSize:18,fontWeight:400,color:th.text}}>{countReached(contacts,period)}</span>
-          <span style={{fontFamily:'Inter',fontSize:9,color:th.tLt,letterSpacing:'0.06em'}}>reached</span>
+          <button onClick={()=>setReachedOpen(true)} style={{background:'transparent',border:'none',cursor:'pointer',padding:0,display:'flex',alignItems:'center',gap:6}}>
+            <span style={{fontFamily:'Cormorant Garamond',fontSize:18,fontWeight:400,color:th.text}}>{countReached(contacts,period)}</span>
+            <span style={{fontFamily:'Inter',fontSize:9,color:th.tLt,letterSpacing:'0.06em'}}>reached</span>
+          </button>
           <select value={period} onChange={e=>onPeriodChange(e.target.value)}
-            style={{background:'transparent',border:'none',fontFamily:'Inter',fontSize:9,color:th.tLt,letterSpacing:'0.06em',cursor:'pointer',outline:'none',padding:0,appearance:'none',WebkitAppearance:'none'}}>
+            style={{background:'transparent',border:'none',fontFamily:'Inter',fontSize:9,color:th.tLt,letterSpacing:'0.06em',cursor:'pointer',outline:'none',padding:0,appearance:'none',WebkitAppearance:'none',maxWidth:80}}>
             {PERIODS.map(p=><option key={p.key} value={p.key} style={{background:th.card,color:th.text}}>{p.label}</option>)}
           </select>
-          <span style={{fontSize:8,color:th.tLt,opacity:0.5}}>▾</span>
         </div>
       </div>
+
+      {/* ── Reached overlay ── */}
+      {reachedOpen&&(()=>{
+        const list=getReachedContacts(contacts,period);
+        const periodLabel=PERIODS.find(p=>p.key===period)?.label||'';
+        return(
+          <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:600,display:'flex',flexDirection:'column'}} onClick={()=>setReachedOpen(false)}>
+            <div style={{background:th.card,borderRadius:'16px 16px 0 0',marginTop:'auto',maxHeight:'75vh',display:'flex',flexDirection:'column'}} onClick={e=>e.stopPropagation()}>
+              <div style={{padding:'18px 20px 12px',borderBottom:`1px solid ${th.bdr}`,flexShrink:0}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <div>
+                    <div style={{fontFamily:'Cormorant Garamond',fontSize:22,fontWeight:400,color:th.text}}>{list.length} Reached</div>
+                    <div style={{fontFamily:'Inter',fontSize:10,color:th.tLt,marginTop:2,letterSpacing:'0.06em'}}>{periodLabel}</div>
+                  </div>
+                  <button onClick={()=>setReachedOpen(false)} style={{background:'transparent',border:`1px solid ${th.bdr}`,borderRadius:'50%',width:30,height:30,cursor:'pointer',color:th.tMed,fontSize:16,display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>
+                </div>
+              </div>
+              <div style={{overflowY:'auto',padding:'12px 16px 24px'}}>
+                {list.length===0&&<div style={{textAlign:'center',padding:'30px 0',fontFamily:'Cormorant Garamond',fontSize:18,fontStyle:'italic',color:th.tLt}}>No contacts reached in this period</div>}
+                {list.map(c=>{
+                  const fc=FCOLOR[c.freq]||FCOLOR.monthly;
+                  const st=STATUS[c.status];
+                  return(
+                    <div key={c.id} className="card" onClick={()=>{setReachedOpen(false);onOpen(c.id);}} style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                      <div>
+                        <div style={{fontFamily:'Cormorant Garamond',fontSize:18,fontWeight:400,color:th.text}}>{c.fn} {c.ln}</div>
+                        <div style={{fontSize:10,color:th.tLt,marginTop:3}}>{fmtDate(c.lc)}</div>
+                      </div>
+                      <div style={{display:'flex',gap:4,flexShrink:0}}>
+                        {st&&<Bdg color={th.tMed} bg={th.noteBg}>{st.label}</Bdg>}
+                        {fc&&<Bdg color={fc.color} bg={fc.bg}>{FREQ[c.freq]?.label}</Bdg>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -1027,6 +1080,17 @@ function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
         <ContactForm f={f} set={set} addrOpen={addrOpen} setAddrOpen={setAddrOpen}/>
         <NotesLog log={f.log||[]} onUpdate={v=>set('log',v)}/>
         <button className={`sv${saved?' ok':''}`} onClick={hSave}>{saved?'✓ Saved':'Save Changes'}</button>
+        <div style={{textAlign:'center',marginTop:14,marginBottom:8}}>
+          {f.lc===todayStr()?(
+            <button onClick={()=>{set('lc','');}} style={{background:'transparent',border:'none',color:'#4E7C5A',fontSize:12,cursor:'pointer',fontFamily:'Inter',opacity:0.8}}>
+              ✓ Counted as reached today · <span style={{textDecoration:'underline'}}>Remove</span>
+            </button>
+          ):(
+            <button onClick={()=>{set('lc',todayStr());}} style={{background:'transparent',border:'none',color:th.tLt,fontSize:12,cursor:'pointer',fontFamily:'Inter',textDecoration:'underline',opacity:0.6}}>
+              Mark as reached today
+            </button>
+          )}
+        </div>
         <div style={{textAlign:'center',marginTop:22}}>
           {cdel?(
             <div style={{display:'flex',gap:10,justifyContent:'center',alignItems:'center'}}>
