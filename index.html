@@ -946,7 +946,10 @@ function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
   const set=(k,v)=>{setF(p=>({...p,[k]:v}));setDirty(true);};
 
   const hSave=()=>{
-    onSave(f);
+    const hadLog=(contact.log||[]).length;
+    const hasLog=(f.log||[]).length;
+    const newEntry=hasLog>hadLog;
+    onSave({...f,lc:newEntry?todayStr():(f.lc||contact.lc||'')});
     setSaved(true);
     setDirty(false);
     setTimeout(()=>setSaved(false),2000);
