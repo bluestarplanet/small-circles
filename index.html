@@ -123,6 +123,28 @@ const TIMEZONES=[
   {label:'Australia — Sydney',value:'Australia/Sydney'},
 ];
 
+// ── Outreach counter ──────────────────────────────────────────────────────────
+const PERIODS=[
+  {key:'week',   label:'This Week'},
+  {key:'month',  label:'This Month'},
+  {key:'30days', label:'Last 30 Days'},
+  {key:'90days', label:'Last 90 Days'},
+  {key:'year',   label:'This Year'},
+  {key:'ytd',    label:'Year to Date'},
+  {key:'alltime',label:'All Time'},
+];
+const countReached=(contacts,period)=>{
+  const today=todayStr();
+  const t=new Date(today+'T00:00:00');
+  let start=null;
+  if(period==='week'){const d=new Date(t);d.setDate(d.getDate()-d.getDay());start=d.toLocaleDateString('en-CA');}
+  else if(period==='month'){start=`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-01`;}
+  else if(period==='30days'){const d=new Date(t);d.setDate(d.getDate()-30);start=d.toLocaleDateString('en-CA');}
+  else if(period==='90days'){const d=new Date(t);d.setDate(d.getDate()-90);start=d.toLocaleDateString('en-CA');}
+  else if(period==='year'||period==='ytd'){start=`${t.getFullYear()}-01-01`;}
+  return contacts.filter(c=>c.lc&&(start?c.lc>=start&&c.lc<=today:true)).length;
+};
+
 // ── Utils ─────────────────────────────────────────────────────────────────────
 const todayStr=()=>{
   const tz=localStorage.getItem('sc-tz')||'';
@@ -682,7 +704,7 @@ function CCard({c,onOpen,onQL,logged}){
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
-function Dashboard({contacts,onOpen,onQL,logged,onInfo,onAdd,onUnsched,showReminder,lastExport,onExport,onDismiss,onToggleDark,view,onViewChange}){
+function Dashboard({contacts,onOpen,onQL,logged,onInfo,onAdd,onUnsched,showReminder,lastExport,onExport,onDismiss,onToggleDark,view,onViewChange,period,onPeriodChange}){
   const th=useTh();
   const t=todayStr();
   const overdue=contacts.filter(c=>c.nad&&c.nad<t).sort((a,b)=>a.nad.localeCompare(b.nad));
@@ -785,8 +807,14 @@ function Dashboard({contacts,onOpen,onQL,logged,onInfo,onAdd,onUnsched,showRemin
 
       <div style={{padding:'10px 20px',background:th.lHead,borderTop:`1px solid ${th.bdr}`,display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
         <button onClick={onInfo} style={{background:'transparent',border:`1px solid ${th.pillBdr}`,borderRadius:'50%',width:28,height:28,cursor:'pointer',color:th.tLt,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',fontStyle:'italic',fontFamily:'serif',fontWeight:'bold'}}>i</button>
-        <div style={{fontFamily:'Inter',fontSize:9,color:th.tLt,letterSpacing:'0.1em',textTransform:'uppercase',opacity:0.5}}>
-          {USE_SB?'Syncing to cloud':(lastExport?`Backed up ${Math.abs(daysUntil(lastExport))} days ago`:'Not yet backed up')}
+        <div style={{display:'flex',alignItems:'center',gap:6}}>
+          <span style={{fontFamily:'Cormorant Garamond',fontSize:18,fontWeight:400,color:th.text}}>{countReached(contacts,period)}</span>
+          <span style={{fontFamily:'Inter',fontSize:9,color:th.tLt,letterSpacing:'0.06em'}}>reached</span>
+          <select value={period} onChange={e=>onPeriodChange(e.target.value)}
+            style={{background:'transparent',border:'none',fontFamily:'Inter',fontSize:9,color:th.tLt,letterSpacing:'0.06em',cursor:'pointer',outline:'none',padding:0,appearance:'none',WebkitAppearance:'none'}}>
+            {PERIODS.map(p=><option key={p.key} value={p.key} style={{background:th.card,color:th.text}}>{p.label}</option>)}
+          </select>
+          <span style={{fontSize:8,color:th.tLt,opacity:0.5}}>▾</span>
         </div>
       </div>
     </div>
@@ -1066,7 +1094,42 @@ function InfoPanel({onClose,onExport,onImport,onImportCSV,lastExport,tz,onTzChan
           <input ref={csvRef} type="file" accept=".csv" style={{display:'none'}} onChange={e=>{onImportCSV(e.target.files[0]);e.target.value='';}}/>
           <button onClick={e=>{e.stopPropagation();csvRef.current.click();}} style={{width:'100%',padding:'10px',background:'transparent',border:'1px solid rgba(92,143,181,0.25)',borderRadius:8,color:'rgba(196,217,238,0.5)',fontFamily:'Inter',fontSize:12,cursor:'pointer',letterSpacing:'0.06em',marginBottom:20}}>↑ Import from CSV</button>
 
-          {/* ── Timezone ── */}
+          {/* ── How to Use ── */}
+          <div style={{borderTop:'1px solid rgba(201,168,112,0.15)',paddingTop:20,marginBottom:20}}>
+            <div style={{fontFamily:'Inter',fontSize:9,letterSpacing:'0.18em',color:'#C9A870',textTransform:'uppercase',marginBottom:14}}>How to Use Small Circles</div>
+            <div style={{fontSize:11,color:'rgba(246,241,233,0.55)',fontFamily:'Inter',lineHeight:1.8}}>
+              Small Circles is a contact system built with rhythm in mind, to remind you who to reach out to, and when.
+            </div>
+            {[
+              {h:'Adding contacts',b:'Tap + to add someone. Fill in what you know: a phone number, an email, a note about who they are. The Conversation field is for a short prompt that appears on their card to remind you what to talk about.'},
+              {h:'Frequency & Status',b:'Every contact has a frequency (how often you want to stay in touch) and a status that reflects where the relationship stands. Together they help you prioritize.'},
+              {h:'Scheduling',b:'Set a next action date and a method. That contact will appear on your home screen when the date arrives. After you connect, use Quick Log to mark it done and automatically schedule the next one.'},
+              {h:'Notes Log',b:'Use the Notes Log inside each contact to record what happened: what they said, what changed, what to remember. It builds a quiet history over time.'},
+              {h:'The home screen',b:'Your home screen shows who\'s overdue, who\'s due today, and who\'s coming up this week, broken out by day. Switch to Weekly or Monthly view for a broader look.'},
+              {h:'Dark mode',b:'Tap the pulsar icon in the top right corner to toggle between light and dark mode. Your preference is remembered.'},
+            ].map(s=>(
+              <div key={s.h} style={{marginTop:14}}>
+                <div style={{fontFamily:'Inter',fontSize:10,fontWeight:500,color:'rgba(246,241,233,0.75)',marginBottom:4,letterSpacing:'0.04em'}}>{s.h}</div>
+                <div style={{fontSize:11,color:'rgba(246,241,233,0.45)',fontFamily:'Inter',lineHeight:1.75}}>{s.b}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* ── Getting Started ── */}
+          <div style={{borderTop:'1px solid rgba(201,168,112,0.15)',paddingTop:20,marginBottom:20}}>
+            <div style={{fontFamily:'Inter',fontSize:9,letterSpacing:'0.18em',color:'#C9A870',textTransform:'uppercase',marginBottom:14}}>Getting Started</div>
+            <div style={{fontSize:10,color:'rgba(246,241,233,0.35)',fontFamily:'Inter',fontStyle:'italic',marginBottom:12,letterSpacing:'0.04em'}}>For new owners</div>
+            <div style={{fontSize:11,color:'rgba(246,241,233,0.45)',fontFamily:'Inter',lineHeight:1.8,marginBottom:14}}>
+              To use Small Circles across all your devices, you'll need a free GitHub account (to host your system) and a free Supabase account (to remember your info across browsers and devices). If you're not sure how to set those up, any AI assistant like Claude can walk you through it in about 15 minutes.
+            </div>
+            <div style={{fontSize:11,color:'rgba(246,241,233,0.45)',fontFamily:'Inter',lineHeight:1.8,marginBottom:14}}>
+              Now that this code is yours, you can use your preferred AI to change the system's look and feel, add or remove features, or mold it in any way to suit your needs so that you'll want to use it every day.
+            </div>
+            <div style={{fontSize:11,color:'rgba(246,241,233,0.6)',fontFamily:'Cormorant Garamond',fontStyle:'italic',lineHeight:1.8,marginBottom:6,fontSize:14}}>
+              The best contact system is not the slickest or most robust. The best contact system is the one you will USE.
+            </div>
+            <div style={{fontSize:11,color:'rgba(246,241,233,0.45)',fontFamily:'Inter',lineHeight:1.8}}>Happy connecting!</div>
+          </div>
           <div style={{borderTop:'1px solid rgba(201,168,112,0.15)',paddingTop:20,marginBottom:20}}>
             <div style={{fontFamily:'Inter',fontSize:9,letterSpacing:'0.18em',color:'#C9A870',textTransform:'uppercase',marginBottom:12}}>Timezone</div>
             <div style={{fontSize:11,color:'rgba(246,241,233,0.45)',fontFamily:'Inter',marginBottom:12,lineHeight:1.7}}>
@@ -1112,6 +1175,8 @@ function App(){
   const [dismissed,setDismissed]=useState(()=>localStorage.getItem('sc-export-dismissed')===todayStr());
   const [toast,setToast]=useState(null);
   const [dashView,setDashView]=useState('daily');
+  const [period,setPeriod]=useState(()=>localStorage.getItem('sc-period')||'month');
+  const handlePeriodChange=p=>{setPeriod(p);localStorage.setItem('sc-period',p);};
   const [tz,setTz]=useState(()=>localStorage.getItem('sc-tz')||'');
   const th=mkTh(dark);
 
@@ -1207,7 +1272,8 @@ function App(){
             onInfo={()=>setInfoOpen(true)} onAdd={()=>{setPrev(screen);setScreen('add');}}
             onUnsched={()=>{setFf('unscheduled');setNav('all');setScreen('list');}}
             showReminder={showReminder} lastExport={lastExport} onExport={doExport} onDismiss={dismissReminder}
-            onToggleDark={toggleDark} view={dashView} onViewChange={setDashView}/>
+            onToggleDark={toggleDark} view={dashView} onViewChange={setDashView}
+            period={period} onPeriodChange={handlePeriodChange}/>
         )}
         {screen==='list'&&(
           <List contacts={contacts} freqFilter={ff} onOpen={openContact} onQL={quickLog} logged={logged}
