@@ -32,7 +32,8 @@ textarea{resize:vertical;min-height:72px;}
 .ql.done{background:#4E7C5A!important;color:#fff!important;border-color:#4E7C5A!important;}
 .sv{width:100%;padding:13px;border:none;border-radius:10px;font-family:'Inter',sans-serif;font-size:14px;font-weight:500;cursor:pointer;transition:background 0.3s;letter-spacing:0.05em;color:#F6F1E9;}
 .sv.ok{background:#4E7C5A!important;}
-.tile{border-radius:10px;padding:12px 14px;flex:1;text-align:center;}
+.tile{border-radius:10px;padding:12px 14px;flex:1;text-align:center;border:none;cursor:pointer;transition:opacity 0.15s;}
+.tile:hover{opacity:0.85;}
 .si{border-radius:24px;padding:9px 16px;font-size:13px;font-family:'Inter',sans-serif;outline:none;width:100%;}
 .icon-btn{background:transparent;border:none;cursor:pointer;padding:4px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;opacity:0.45;transition:opacity 0.15s;}
 .icon-btn:hover{opacity:0.85;}
@@ -142,19 +143,9 @@ const getReachedContacts=(contacts,period)=>{
   else if(period==='30days'){const d=new Date(t);d.setDate(d.getDate()-30);start=d.toLocaleDateString('en-CA');}
   else if(period==='90days'){const d=new Date(t);d.setDate(d.getDate()-90);start=d.toLocaleDateString('en-CA');}
   else if(period==='year'||period==='ytd'){start=`${t.getFullYear()}-01-01`;}
-  return contacts.filter(c=>c.lc&&(start?c.lc>=start&&c.lc<=today:true)).sort((a,b)=>b.lc.localeCompare(a.lc));
+  return contacts.filter(c=>!c.archived&&c.lc&&(start?c.lc>=start&&c.lc<=today:true)).sort((a,b)=>b.lc.localeCompare(a.lc));
 };
-const countReached=(contacts,period)=>{
-  const today=todayStr();
-  const t=new Date(today+'T00:00:00');
-  let start=null;
-  if(period==='week'){const d=new Date(t);d.setDate(d.getDate()-d.getDay());start=d.toLocaleDateString('en-CA');}
-  else if(period==='month'){start=`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-01`;}
-  else if(period==='30days'){const d=new Date(t);d.setDate(d.getDate()-30);start=d.toLocaleDateString('en-CA');}
-  else if(period==='90days'){const d=new Date(t);d.setDate(d.getDate()-90);start=d.toLocaleDateString('en-CA');}
-  else if(period==='year'||period==='ytd'){start=`${t.getFullYear()}-01-01`;}
-  return contacts.filter(c=>c.lc&&(start?c.lc>=start&&c.lc<=today:true)).length;
-};
+const countReached=(contacts,period)=>getReachedContacts(contacts,period).length;
 
 // ── Utils ─────────────────────────────────────────────────────────────────────
 const todayStr=()=>{
@@ -170,7 +161,6 @@ const daysUntil=str=>str?Math.round((new Date(str+'T00:00:00')-new Date(todayStr
 const fmtDate=str=>str?new Date(str+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
 const uid=()=>Math.random().toString(36).slice(2,10);
 
-// ── fmtMet: converts ISO date strings (2026-05-28) to readable format (May 28, 2026) ──
 const fmtMet=str=>{
   if(!str)return'';
   if(/^\d{4}-\d{2}-\d{2}$/.test(str.trim())){
@@ -197,14 +187,14 @@ const bdayIn14=str=>{const d=parseBday(str);if(!d)return false;const diff=(d-new
 const bdayDays=str=>{const d=parseBday(str);if(!d)return null;return Math.max(0,Math.round((d-new Date())/86400000));};
 
 const migrateContact=c=>({
-  addr1:'',city:'',state:'',zip:'',anniversaries:[],...c,
+  addr1:'',city:'',state:'',zip:'',anniversaries:[],archived:false,...c,
   freq:({pulse:'weekly',flow:'monthly',phase:'quarterly',revolve:'annually',rest:'bespoke'}[c.freq]||c.freq||'monthly'),
   status:({static:'new',signal:'nurturing',lock:'active',echo:'legacy',relay:'nurturing'}[c.status]||c.status||'new'),
 });
 
 const mk=(fn,ln,ph,em,src,lc,meth,res,na,bn,notes,met,starter)=>({
   id:uid(),fn,ln,ph:ph||'',em:em||'',src,met:met||'',lc:lc||'',meth:meth||'',res:res||'',na:na||'',nad:'',
-  bn:bn||'',notes:notes||'',freq:src==='Open House'?'quarterly':'monthly',status:'new',
+  bn:bn||'',notes:notes||'',freq:src==='Open House'?'quarterly':'monthly',status:'new',archived:false,
   birthday:'',starter:starter||'',log:[],addr1:'',city:'',state:'',zip:'',anniversaries:[],
 });
 
@@ -418,7 +408,6 @@ function ConnectionSection({freq,status,onFreq,onStatus}){
 }
 
 function MethodField({value,onChange}){
-  const th=useTh();
   const [custom,setCustom]=useState(value&&!METHODS.includes(value)?value:'');
   const isOther=value==='Other'||(!METHODS.includes(value)&&value);
   const sel=isOther?'Other':(value||'');
@@ -516,32 +505,25 @@ function MonthCalendar({contacts,onOpen}){
   const [year,setYear]=useState(new Date().getFullYear());
   const [month,setMonth]=useState(new Date().getMonth());
   const [selected,setSelected]=useState(null);
-
   const firstDay=new Date(year,month,1).getDay();
   const daysInMonth=new Date(year,month+1,0).getDate();
   const todayKey=todayStr();
-
   const byDate={};
   contacts.forEach(c=>{
-    if(c.nad){
+    if(!c.archived&&c.nad){
       const d=new Date(c.nad+'T00:00:00');
       if(d.getFullYear()===year&&d.getMonth()===month){
-        const day=d.getDate();
-        if(!byDate[day])byDate[day]=[];
-        byDate[day].push(c);
+        const day=d.getDate();if(!byDate[day])byDate[day]=[];byDate[day].push(c);
       }
     }
   });
-
   const prevMonth=()=>{if(month===0){setMonth(11);setYear(y=>y-1);}else setMonth(m=>m-1);setSelected(null);};
   const nextMonth=()=>{if(month===11){setMonth(0);setYear(y=>y+1);}else setMonth(m=>m+1);setSelected(null);};
   const monthName=new Date(year,month,1).toLocaleDateString('en-US',{month:'long',year:'numeric'});
   const selContacts=selected?byDate[selected]||[]:[];
-
   const cells=[];
   for(let i=0;i<firstDay;i++)cells.push(null);
   for(let d=1;d<=daysInMonth;d++)cells.push(d);
-
   return(
     <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
       <div style={{padding:'12px 16px 10px',background:th.lHead,borderBottom:`1px solid ${th.bdr}`,flexShrink:0}}>
@@ -560,8 +542,7 @@ function MonthCalendar({contacts,onOpen}){
             if(!d)return <div key={`e${i}`}/>;
             const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
             const isToday=dateStr===todayKey;
-            const cs=byDate[d]||[];
-            const isSel=selected===d;
+            const cs=byDate[d]||[];const isSel=selected===d;
             const dot=cs.length>0?(cs.length===1?FCOLOR[cs[0].freq]?.color||'#9E9288':'#9E9288'):null;
             return(
               <div key={d} onClick={()=>setSelected(isSel?null:d)}
@@ -579,8 +560,7 @@ function MonthCalendar({contacts,onOpen}){
               {new Date(year,month,selected).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}
             </div>
             {selContacts.map(c=>{
-              const fc=FCOLOR[c.freq]||FCOLOR.monthly;
-              const st=STATUS[c.status];
+              const fc=FCOLOR[c.freq]||FCOLOR.monthly;const st=STATUS[c.status];
               return(
                 <div key={c.id} className="card" onClick={()=>onOpen(c.id)} style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                   <div>
@@ -609,18 +589,14 @@ function MonthCalendar({contacts,onOpen}){
 function WeekView({contacts,onOpen,onQL,logged}){
   const th=useTh();
   const [weekStart,setWeekStart]=useState(()=>{
-    const d=new Date();d.setHours(0,0,0,0);
-    const day=d.getDay();d.setDate(d.getDate()-day);return d;
+    const d=new Date();d.setHours(0,0,0,0);const day=d.getDay();d.setDate(d.getDate()-day);return d;
   });
-  const days=Array.from({length:7},(_,i)=>{
-    const d=new Date(weekStart);d.setDate(weekStart.getDate()+i);return d;
-  });
+  const days=Array.from({length:7},(_,i)=>{const d=new Date(weekStart);d.setDate(weekStart.getDate()+i);return d;});
   const dStr=d=>d.toLocaleDateString('en-CA');
   const todayKey=todayStr();
   const prevWeek=()=>{const d=new Date(weekStart);d.setDate(d.getDate()-7);setWeekStart(d);};
   const nextWeek=()=>{const d=new Date(weekStart);d.setDate(d.getDate()+7);setWeekStart(d);};
   const weekLabel=`${days[0].toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${days[6].toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`;
-
   return(
     <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
       <div style={{padding:'12px 16px 10px',background:th.lHead,borderBottom:`1px solid ${th.bdr}`,flexShrink:0}}>
@@ -633,22 +609,20 @@ function WeekView({contacts,onOpen,onQL,logged}){
       <div style={{flex:1,overflowY:'auto',padding:'12px 14px 80px',background:th.bg}}>
         {days.map(day=>{
           const ds=dStr(day);
-          const dayContacts=contacts.filter(c=>c.nad===ds).sort((a,b)=>`${a.ln}${a.fn}`.localeCompare(`${b.ln}${b.fn}`));
+          const dayContacts=contacts.filter(c=>!c.archived&&c.nad===ds).sort((a,b)=>`${a.ln}${a.fn}`.localeCompare(`${b.ln}${b.fn}`));
           const isToday=ds===todayKey;
           return(
             <div key={ds} style={{marginBottom:18}}>
               <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
                 <div style={{width:3,height:14,borderRadius:2,background:isToday?'#B0607A':th.bdr,flexShrink:0}}/>
                 <span style={{fontFamily:'Inter',fontSize:10,fontWeight:500,letterSpacing:'0.1em',textTransform:'uppercase',color:isToday?'#B0607A':th.tLt}}>
-                  {day.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})}
-                  {isToday&&' — Today'}
+                  {day.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})}{isToday&&' — Today'}
                 </span>
               </div>
               {dayContacts.length===0
                 ?<div style={{fontSize:12,color:th.tLt,fontStyle:'italic',paddingLeft:11,opacity:0.5}}>Nothing scheduled</div>
                 :dayContacts.map(c=>{
-                  const fc=FCOLOR[c.freq]||FCOLOR.monthly;
-                  const st=STATUS[c.status];
+                  const fc=FCOLOR[c.freq]||FCOLOR.monthly;const st=STATUS[c.status];
                   return(
                     <div key={c.id} className="card" onClick={()=>onOpen(c.id)}>
                       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8,marginBottom:4}}>
@@ -678,7 +652,7 @@ function WeekView({contacts,onOpen,onQL,logged}){
 }
 
 // ── CCard ─────────────────────────────────────────────────────────────────────
-function CCard({c,onOpen,onQL,logged}){
+function CCard({c,onOpen,onQL,logged,dimmed}){
   const th=useTh();
   const fc=FCOLOR[c.freq]||FCOLOR.monthly;
   const st=STATUS[c.status];
@@ -691,7 +665,7 @@ function CCard({c,onOpen,onQL,logged}){
     else{nc=th.tLt;nl=`in ${dd} days`;}
   }
   return(
-    <div className="card" onClick={()=>onOpen(c.id)}>
+    <div className="card" onClick={()=>onOpen(c.id)} style={{opacity:dimmed?0.5:1}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8,marginBottom:4}}>
         <span style={{fontFamily:'Cormorant Garamond',fontSize:20,fontWeight:400,color:th.text,lineHeight:1.2}}>{c.fn} {c.ln}</span>
         <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'flex-end',flexShrink:0}}>
@@ -706,9 +680,9 @@ function CCard({c,onOpen,onQL,logged}){
           {c.nad?<span style={{fontSize:11,color:nc,fontWeight:500}}>{c.na&&c.na+' · '}{nl}</span>
             :<span style={{fontSize:11,color:th.tLt,fontStyle:'italic'}}>Unscheduled</span>}
         </div>
-        <button className={`ql${logged?' done':''}`} onClick={e=>{e.stopPropagation();onQL(c.id);}}>
+        {!dimmed&&<button className={`ql${logged?' done':''}`} onClick={e=>{e.stopPropagation();onQL(c.id);}}>
           {logged?'✓ Logged':'Quick Log'}
-        </button>
+        </button>}
       </div>
     </div>
   );
@@ -718,11 +692,12 @@ function CCard({c,onOpen,onQL,logged}){
 function Dashboard({contacts,onOpen,onQL,logged,onInfo,onAdd,onUnsched,showReminder,lastExport,onExport,onDismiss,onToggleDark,view,onViewChange,period,onPeriodChange}){
   const th=useTh();
   const t=todayStr();
-  const overdue=contacts.filter(c=>c.nad&&c.nad<t).sort((a,b)=>a.nad.localeCompare(b.nad));
-  const today=contacts.filter(c=>c.nad===t);
-  const week=contacts.filter(c=>c.nad&&c.nad>t&&daysUntil(c.nad)<=7).sort((a,b)=>a.nad.localeCompare(b.nad));
-  const unsched=contacts.filter(c=>!c.nad);
-  const bdays=contacts.filter(c=>bdayIn14(c.birthday)).sort((a,b)=>(bdayDays(a.birthday)||99)-(bdayDays(b.birthday)||99));
+  const active=contacts.filter(c=>!c.archived);
+  const overdue=active.filter(c=>c.nad&&c.nad<t).sort((a,b)=>a.nad.localeCompare(b.nad));
+  const today=active.filter(c=>c.nad===t);
+  const week=active.filter(c=>c.nad&&c.nad>t&&daysUntil(c.nad)<=7).sort((a,b)=>a.nad.localeCompare(b.nad));
+  const unsched=active.filter(c=>!c.nad);
+  const bdays=active.filter(c=>bdayIn14(c.birthday)).sort((a,b)=>(bdayDays(a.birthday)||99)-(bdayDays(b.birthday)||99));
   const empty=overdue.length===0&&today.length===0&&week.length===0;
   const [reachedOpen,setReachedOpen]=useState(false);
   const dl=new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
@@ -742,11 +717,15 @@ function Dashboard({contacts,onOpen,onQL,logged,onInfo,onAdd,onUnsched,showRemin
           </div>
         </div>
         <div style={{display:'flex',gap:10,marginTop:16}}>
-          {[{n:today.length,label:'Today',bg:'rgba(176,96,122,0.18)',c:'#EECDD6'},{n:week.length,label:'This Week',bg:'rgba(92,143,181,0.18)',c:'#C4D9EE'},{n:unsched.length,label:'Unscheduled',bg:'rgba(255,255,255,0.06)',c:'#D5CEC5'}].map(x=>(
-            <div key={x.label} className="tile" style={{background:x.bg}}>
+          {[
+            {n:today.length,label:'Today',bg:'rgba(176,96,122,0.18)',c:'#EECDD6',action:()=>onViewChange('daily')},
+            {n:week.length,label:'This Week',bg:'rgba(92,143,181,0.18)',c:'#C4D9EE',action:()=>onViewChange('weekly')},
+            {n:unsched.length,label:'Unscheduled',bg:'rgba(255,255,255,0.06)',c:'#D5CEC5',action:()=>onUnsched()},
+          ].map(x=>(
+            <button key={x.label} className="tile" onClick={x.action} style={{background:x.bg}}>
               <div style={{fontFamily:'Cormorant Garamond',fontSize:28,fontWeight:300,color:x.c}}>{x.n}</div>
               <div style={{fontFamily:'Inter',fontSize:9,letterSpacing:'0.12em',color:x.c,opacity:0.65,textTransform:'uppercase',marginTop:2}}>{x.label}</div>
-            </div>
+            </button>
           ))}
         </div>
         <div style={{display:'flex',gap:4,marginTop:14,justifyContent:'center'}}>
@@ -850,8 +829,7 @@ function Dashboard({contacts,onOpen,onQL,logged,onInfo,onAdd,onUnsched,showRemin
               <div style={{overflowY:'auto',padding:'12px 16px 24px'}}>
                 {list.length===0&&<div style={{textAlign:'center',padding:'30px 0',fontFamily:'Cormorant Garamond',fontSize:18,fontStyle:'italic',color:th.tLt}}>No contacts reached in this period</div>}
                 {list.map(c=>{
-                  const fc=FCOLOR[c.freq]||FCOLOR.monthly;
-                  const st=STATUS[c.status];
+                  const fc=FCOLOR[c.freq]||FCOLOR.monthly;const st=STATUS[c.status];
                   return(
                     <div key={c.id} className="card" onClick={()=>{setReachedOpen(false);onOpen(c.id);}} style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                       <div>
@@ -879,10 +857,12 @@ function List({contacts,freqFilter,onOpen,onQL,logged,onAdd}){
   const th=useTh();
   const [search,setSearch]=useState('');
   const [sf,setSf]=useState(null);
+  const [showArchived,setShowArchived]=useState(false);
   const title=freqFilter==='unscheduled'?'Unscheduled':freqFilter?FREQ[freqFilter]?.label:'All Contacts';
   const fc=freqFilter?FCOLOR[freqFilter]:null;
   const tc=fc?fc.color:th.text;
   const list=contacts
+    .filter(c=>!c.archived)
     .filter(c=>freqFilter==='unscheduled'?!c.nad:freqFilter?c.freq===freqFilter:true)
     .filter(c=>sf?c.status===sf:true)
     .filter(c=>{
@@ -894,6 +874,7 @@ function List({contacts,freqFilter,onOpen,onQL,logged,onAdd}){
       if(a.nad)return -1;if(b.nad)return 1;
       return `${a.ln}${a.fn}`.localeCompare(`${b.ln}${b.fn}`);
     });
+  const archived=!freqFilter?contacts.filter(c=>c.archived).sort((a,b)=>`${a.ln}${a.fn}`.localeCompare(`${b.ln}${b.fn}`)):[];
   return(
     <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
       <div style={{background:th.lHead,borderBottom:`1px solid ${th.bdr}`,flexShrink:0,padding:'14px 16px 10px'}}>
@@ -917,6 +898,16 @@ function List({contacts,freqFilter,onOpen,onQL,logged,onAdd}){
       <div style={{flex:1,overflowY:'auto',padding:'12px 14px 80px',background:th.bg}}>
         {list.length===0&&<div style={{textAlign:'center',paddingTop:60,fontFamily:'Cormorant Garamond',fontSize:20,fontStyle:'italic',color:th.tLt}}>No contacts found</div>}
         {list.map(c=><CCard key={c.id} c={c} onOpen={onOpen} onQL={onQL} logged={!!logged[c.id]}/>)}
+        {archived.length>0&&(
+          <div style={{borderTop:`1px solid ${th.bdr}`,marginTop:16,paddingTop:16}}>
+            <button onClick={()=>setShowArchived(p=>!p)} style={{background:'transparent',border:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8,width:'100%',paddingBottom:12}}>
+              <span style={{fontFamily:'Inter',fontSize:9,fontWeight:500,letterSpacing:'0.13em',textTransform:'uppercase',color:th.tLt}}>Archived</span>
+              <span style={{fontFamily:'Inter',fontSize:9,color:th.tLt,opacity:0.6}}>({archived.length})</span>
+              <span style={{fontFamily:'Inter',fontSize:11,color:th.tLt,opacity:0.5,marginLeft:'auto'}}>{showArchived?'▲':'▼'}</span>
+            </button>
+            {showArchived&&archived.map(c=><CCard key={c.id} c={c} onOpen={onOpen} onQL={onQL} logged={!!logged[c.id]} dimmed/>)}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -988,7 +979,7 @@ function ContactForm({f,set,addrOpen,setAddrOpen}){
 // ── Detail ────────────────────────────────────────────────────────────────────
 function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
   const th=useTh();
-  const [f,setF]=useState({addr1:'',city:'',state:'',zip:'',anniversaries:[],...contact,met:fmtMet(contact.met||'')});
+  const [f,setF]=useState({addr1:'',city:'',state:'',zip:'',anniversaries:[],archived:false,...contact,met:fmtMet(contact.met||'')});
   const [saved,setSaved]=useState(false);
   const [cdel,setCdel]=useState(false);
   const [addrOpen,setAddrOpen]=useState(!!(contact.addr1||contact.city));
@@ -1002,62 +993,32 @@ function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
     const hadLog=(contact.log||[]).length;
     const hasLog=(f.log||[]).length;
     const newEntry=hasLog>hadLog;
-    onSave({...f,lc:newEntry?todayStr():(f.lc||contact.lc||'')});
-    setSaved(true);
-    setDirty(false);
+    const days=FREQ[f.freq]?.days;
+    const advancedNad=newEntry&&days?addDays(todayStr(),days):f.nad;
+    onSave({...f,lc:newEntry?todayStr():(f.lc||contact.lc||''),nad:advancedNad});
+    setSaved(true);setDirty(false);
     setTimeout(()=>setSaved(false),2000);
   };
 
   const tryNav=(action)=>{
-    if(dirty){
-      setPendingAction(()=>action);
-      setShowExit(true);
-    } else {
-      action();
-    }
+    if(dirty){setPendingAction(()=>action);setShowExit(true);}
+    else action();
   };
-
-  const handleSaveAndGo=()=>{
-    onSave(f);
-    setDirty(false);
-    setShowExit(false);
-    if(pendingAction) pendingAction();
-    setPendingAction(null);
-  };
-
-  const handleExitAnyway=()=>{
-    setDirty(false);
-    setShowExit(false);
-    if(pendingAction) pendingAction();
-    setPendingAction(null);
-  };
-
-  const handleCancelExit=()=>{
-    setShowExit(false);
-    setPendingAction(null);
-  };
+  const handleSaveAndGo=()=>{onSave({...f,lc:(contact.log||[]).length<(f.log||[]).length?todayStr():(f.lc||contact.lc||'')});setDirty(false);setShowExit(false);if(pendingAction)pendingAction();setPendingAction(null);};
+  const handleExitAnyway=()=>{setDirty(false);setShowExit(false);if(pendingAction)pendingAction();setPendingAction(null);};
+  const handleCancelExit=()=>{setShowExit(false);setPendingAction(null);};
 
   return(
     <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',position:'relative'}}>
-      {/* ── Unsaved changes overlay ── */}
       {showExit&&(
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:600,display:'flex',alignItems:'center',justifyContent:'center',padding:28}}>
           <div style={{background:th.card,borderRadius:16,padding:28,maxWidth:300,width:'100%',textAlign:'center',boxShadow:'0 8px 32px rgba(0,0,0,0.3)'}}>
             <div style={{fontFamily:'Cormorant Garamond',fontSize:22,fontWeight:400,color:th.text,marginBottom:8}}>Unsaved Changes</div>
             <div style={{fontSize:12,color:th.tMed,marginBottom:24,lineHeight:1.7,fontFamily:'Inter'}}>You've made changes that haven't been saved yet.</div>
             <div style={{display:'flex',flexDirection:'column',gap:10}}>
-              <button onClick={handleSaveAndGo}
-                style={{background:'#16293D',color:'#F6F1E9',border:'none',borderRadius:10,padding:'12px',fontFamily:'Inter',fontSize:13,cursor:'pointer',fontWeight:500,letterSpacing:'0.04em'}}>
-                Save Changes
-              </button>
-              <button onClick={handleExitAnyway}
-                style={{background:'transparent',border:`1px solid ${th.bdr}`,color:th.tMed,borderRadius:10,padding:'12px',fontFamily:'Inter',fontSize:13,cursor:'pointer'}}>
-                Exit Without Saving
-              </button>
-              <button onClick={handleCancelExit}
-                style={{background:'transparent',border:'none',color:th.tLt,fontSize:12,cursor:'pointer',padding:'6px',fontFamily:'Inter',textDecoration:'underline',opacity:0.7}}>
-                Cancel
-              </button>
+              <button onClick={handleSaveAndGo} style={{background:'#16293D',color:'#F6F1E9',border:'none',borderRadius:10,padding:'12px',fontFamily:'Inter',fontSize:13,cursor:'pointer',fontWeight:500,letterSpacing:'0.04em'}}>Save Changes</button>
+              <button onClick={handleExitAnyway} style={{background:'transparent',border:`1px solid ${th.bdr}`,color:th.tMed,borderRadius:10,padding:'12px',fontFamily:'Inter',fontSize:13,cursor:'pointer'}}>Exit Without Saving</button>
+              <button onClick={handleCancelExit} style={{background:'transparent',border:'none',color:th.tLt,fontSize:12,cursor:'pointer',padding:'6px',fontFamily:'Inter',textDecoration:'underline',opacity:0.7}}>Cancel</button>
             </div>
           </div>
         </div>
@@ -1067,6 +1028,7 @@ function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontFamily:'Cormorant Garamond',fontSize:22,fontWeight:400,color:'#F6F1E9',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.fn} {f.ln}</div>
           <div style={{display:'flex',gap:5,marginTop:4,flexWrap:'wrap'}}>
+            {f.archived&&<Bdg color="#6E6158" bg="rgba(110,97,88,0.25)">Archived</Bdg>}
             {f.status&&<Bdg color="#9E9288" bg="rgba(255,255,255,0.08)">{STATUS[f.status]?.label||f.status}</Bdg>}
             {f.freq&&<Bdg color={FCOLOR[f.freq]?.color||'#9E9288'} bg={FCOLOR[f.freq]?.bg||'#EEE'}>{FREQ[f.freq]?.label||f.freq}</Bdg>}
           </div>
@@ -1080,27 +1042,33 @@ function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
         <ContactForm f={f} set={set} addrOpen={addrOpen} setAddrOpen={setAddrOpen}/>
         <NotesLog log={f.log||[]} onUpdate={v=>set('log',v)}/>
         <button className={`sv${saved?' ok':''}`} onClick={hSave}>{saved?'✓ Saved':'Save Changes'}</button>
-        <div style={{textAlign:'center',marginTop:14,marginBottom:8}}>
+        <div style={{textAlign:'center',marginTop:14,marginBottom:4}}>
           {f.lc===todayStr()?(
-            <button onClick={()=>{set('lc','');}} style={{background:'transparent',border:'none',color:'#4E7C5A',fontSize:12,cursor:'pointer',fontFamily:'Inter',opacity:0.8}}>
+            <button onClick={()=>set('lc','')} style={{background:'transparent',border:'none',color:'#4E7C5A',fontSize:12,cursor:'pointer',fontFamily:'Inter',opacity:0.8}}>
               ✓ Counted as reached today · <span style={{textDecoration:'underline'}}>Remove</span>
             </button>
           ):(
-            <button onClick={()=>{set('lc',todayStr());}} style={{background:'transparent',border:'none',color:th.tLt,fontSize:12,cursor:'pointer',fontFamily:'Inter',textDecoration:'underline',opacity:0.6}}>
+            <button onClick={()=>set('lc',todayStr())} style={{background:'transparent',border:'none',color:th.tLt,fontSize:12,cursor:'pointer',fontFamily:'Inter',textDecoration:'underline',opacity:0.6}}>
               Mark as reached today
             </button>
           )}
         </div>
-        <div style={{textAlign:'center',marginTop:22}}>
-          {cdel?(
-            <div style={{display:'flex',gap:10,justifyContent:'center',alignItems:'center'}}>
-              <span style={{fontSize:12,color:'#B03030'}}>Remove this contact?</span>
-              <button onClick={()=>onDelete(contact.id)} style={{background:'#B03030',color:'#fff',border:'none',borderRadius:6,padding:'4px 14px',fontSize:12,cursor:'pointer'}}>Confirm</button>
-              <button onClick={()=>setCdel(false)} style={{background:'transparent',border:`1px solid ${th.pillBdr}`,color:th.tMed,borderRadius:6,padding:'4px 14px',fontSize:12,cursor:'pointer'}}>Cancel</button>
-            </div>
-          ):(
-            <button onClick={()=>setCdel(true)} style={{background:'transparent',border:'none',color:th.tLt,fontSize:12,cursor:'pointer',textDecoration:'underline',opacity:0.6}}>Remove from Small Circles</button>
-          )}
+        <div style={{textAlign:'center',marginTop:18}}>
+          <div style={{display:'flex',gap:16,justifyContent:'center',alignItems:'center'}}>
+            <button onClick={()=>set('archived',!f.archived)} style={{background:'transparent',border:'none',color:f.archived?'#4E7C5A':th.tLt,fontSize:12,cursor:'pointer',textDecoration:'underline',opacity:f.archived?0.8:0.6,fontFamily:'Inter'}}>
+              {f.archived?'✓ Archived · Restore':'Archive this contact'}
+            </button>
+            <span style={{color:th.bdr,fontSize:12}}>·</span>
+            {cdel?(
+              <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                <span style={{fontSize:12,color:'#B03030'}}>Remove?</span>
+                <button onClick={()=>onDelete(contact.id)} style={{background:'#B03030',color:'#fff',border:'none',borderRadius:6,padding:'3px 12px',fontSize:12,cursor:'pointer'}}>Confirm</button>
+                <button onClick={()=>setCdel(false)} style={{background:'transparent',border:`1px solid ${th.pillBdr}`,color:th.tMed,borderRadius:6,padding:'3px 12px',fontSize:12,cursor:'pointer'}}>Cancel</button>
+              </div>
+            ):(
+              <button onClick={()=>setCdel(true)} style={{background:'transparent',border:'none',color:th.tLt,fontSize:12,cursor:'pointer',textDecoration:'underline',opacity:0.6,fontFamily:'Inter'}}>Remove from Small Circles</button>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -1110,7 +1078,7 @@ function Detail({contact,onSave,onDelete,onBack,onNext,onPrev,hasNext,hasPrev}){
 // ── Add ───────────────────────────────────────────────────────────────────────
 function Add({onSave,onBack}){
   const th=useTh();
-  const [f,setF]=useState({id:uid(),fn:'',ln:'',ph:'',em:'',src:'SOI',met:fmtMet(todayStr()),na:'',nad:'',bn:'',notes:'',freq:'monthly',status:'new',birthday:'',starter:'',log:[],addr1:'',city:'',state:'',zip:'',anniversaries:[]});
+  const [f,setF]=useState({id:uid(),fn:'',ln:'',ph:'',em:'',src:'SOI',met:fmtMet(todayStr()),na:'',nad:'',bn:'',notes:'',freq:'monthly',status:'new',archived:false,birthday:'',starter:'',log:[],addr1:'',city:'',state:'',zip:'',anniversaries:[]});
   const [addrOpen,setAddrOpen]=useState(false);
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   return(
@@ -1142,7 +1110,7 @@ function InfoPanel({onClose,onExport,onImport,onImportCSV,lastExport,tz,onTzChan
     document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
   };
   return(
-    <div onClick={onClose} style={{position:'fixed',inset:0,background:'#16293D',zIndex:500,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:32,overflowY:'auto'}}>
+    <div onClick={onClose} style={{position:'fixed',inset:0,background:'#16293D',zIndex:500,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-start',padding:32,overflowY:'auto'}}>
       <div style={{textAlign:'center',maxWidth:300,width:'100%'}} onClick={e=>e.stopPropagation()}>
         <Pulsar size={46} color="#C9A870"/>
         <div style={{fontFamily:'Cormorant Garamond',fontSize:22,fontWeight:300,color:'#F6F1E9',letterSpacing:'0.14em',marginTop:14,marginBottom:28,textTransform:'uppercase'}}>Small Circles</div>
@@ -1171,8 +1139,8 @@ function InfoPanel({onClose,onExport,onImport,onImportCSV,lastExport,tz,onTzChan
               {h:'Adding contacts',b:'Tap + to add someone. Fill in what you know: a phone number, an email, a note about who they are. The Conversation field is for a short prompt that appears on their card to remind you what to talk about.'},
               {h:'Frequency & Status',b:'Every contact has a frequency (how often you want to stay in touch) and a status that reflects where the relationship stands. Together they help you prioritize.'},
               {h:'Scheduling',b:'Set a next action date and a method. That contact will appear on your home screen when the date arrives. After you connect, use Quick Log to mark it done and automatically schedule the next one.'},
-              {h:'Notes Log',b:'Use the Notes Log inside each contact to record what happened: what they said, what changed, what to remember. It builds a quiet history over time.'},
-              {h:'The home screen',b:'Your home screen shows who\'s overdue, who\'s due today, and who\'s coming up this week, broken out by day. Switch to Weekly or Monthly view for a broader look.'},
+              {h:'Notes Log',b:"Use the Notes Log inside each contact to record what happened: what they said, what changed, what to remember. It builds a quiet history over time."},
+              {h:'The home screen',b:"Your home screen shows who's overdue, who's due today, and who's coming up this week, broken out by day. Switch to Weekly or Monthly view for a broader look."},
               {h:'Dark mode',b:'Tap the pulsar icon in the top right corner to toggle between light and dark mode. Your preference is remembered.'},
             ].map(s=>(
               <div key={s.h} style={{marginTop:14}}>
@@ -1182,7 +1150,7 @@ function InfoPanel({onClose,onExport,onImport,onImportCSV,lastExport,tz,onTzChan
             ))}
           </div>
 
-          {/* ── Getting Started ── */}
+          {/* ── Set Up ── */}
           <div style={{borderTop:'1px solid rgba(201,168,112,0.15)',paddingTop:20,marginBottom:20}}>
             <div style={{fontFamily:'Inter',fontSize:9,letterSpacing:'0.18em',color:'#C9A870',textTransform:'uppercase',marginBottom:14}}>Set Up</div>
             <div style={{fontSize:11,color:'rgba(246,241,233,0.45)',fontFamily:'Inter',lineHeight:1.8}}>
@@ -1204,15 +1172,14 @@ function InfoPanel({onClose,onExport,onImport,onImportCSV,lastExport,tz,onTzChan
             </div>
             <div style={{fontSize:11,color:'rgba(246,241,233,0.45)',fontFamily:'Inter',lineHeight:1.8}}>Happy connecting!</div>
           </div>
-          <div style={{borderTop:'1px solid rgba(201,168,112,0.15)',paddingTop:20,marginBottom:20}}>
+
+          {/* ── Timezone ── */}
+          <div style={{borderTop:'1px solid rgba(201,168,112,0.15)',paddingTop:20,marginBottom:28}}>
             <div style={{fontFamily:'Inter',fontSize:9,letterSpacing:'0.18em',color:'#C9A870',textTransform:'uppercase',marginBottom:12}}>Timezone</div>
             <div style={{fontSize:11,color:'rgba(246,241,233,0.45)',fontFamily:'Inter',marginBottom:12,lineHeight:1.7}}>
               Device timezone: <span style={{color:'rgba(246,241,233,0.7)'}}>{detectedTz}</span>
             </div>
-            <select
-              value={tz||''}
-              onChange={e=>{e.stopPropagation();onTzChange(e.target.value);}}
-              onClick={e=>e.stopPropagation()}
+            <select value={tz||''} onChange={e=>{e.stopPropagation();onTzChange(e.target.value);}} onClick={e=>e.stopPropagation()}
               style={{background:'rgba(255,255,255,0.06)',border:'1px solid rgba(201,168,112,0.25)',borderRadius:8,color:tz?'#F6F1E9':'rgba(246,241,233,0.5)',padding:'9px 12px',fontFamily:'Inter',fontSize:11,width:'100%',cursor:'pointer',letterSpacing:'0.02em'}}>
               {TIMEZONES.map(t=>(
                 <option key={t.value} value={t.value} style={{background:'#16293D',color:'#F6F1E9'}}>
@@ -1260,11 +1227,7 @@ function App(){
     return()=>{clearTimeout(t1);clearTimeout(t2);};
   },[]);
 
-  const handleTzChange=newTz=>{
-    setTz(newTz);
-    localStorage.setItem('sc-tz',newTz);
-  };
-
+  const handleTzChange=newTz=>{setTz(newTz);localStorage.setItem('sc-tz',newTz);};
   const persist=next=>{setContacts(next);saveContacts(next);};
   const handleNav=k=>{setNav(k);if(k==='home'){setScreen('dashboard');}else{setFf(k==='all'?null:k);setScreen('list');}};
   const openContact=id=>{setPrev(screen);setSid(id);setScreen('detail');};
@@ -1312,7 +1275,7 @@ function App(){
         const newContacts=lines.slice(1).filter(l=>l.trim()).map(line=>{
           const cols=line.split(',');
           return{id:uid(),fn:get(cols,fi),ln:get(cols,li),ph:get(cols,pi),em:get(cols,ei),src:get(cols,si)||'SOI',
-            met:fmtMet(get(cols,meti)),notes:get(cols,ni),
+            met:fmtMet(get(cols,meti)),notes:get(cols,ni),archived:false,
             freq:freqMap[get(cols,fri).toLowerCase()]||'monthly',status:statusMap[get(cols,sti).toLowerCase()]||'new',
             birthday:get(cols,bi),starter:get(cols,ci),lc:'',meth:'',res:'',na:'',nad:'',bn:'',log:[],addr1:'',city:'',state:'',zip:'',anniversaries:[]};
         }).filter(c=>c.fn||c.ln);
