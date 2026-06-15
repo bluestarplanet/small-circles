@@ -757,9 +757,9 @@ function Dashboard({contacts,onOpen,onQL,logged,onInfo,onAdd,onUnsched,showRemin
           )}
           {overdue.length>0&&<div style={{marginBottom:22}}><Accent color="#B03030" label="Overdue"/>{overdue.map(c=><CCard key={c.id} c={c} onOpen={onOpen} onQL={onQL} logged={!!logged[c.id]}/>)}</div>}
           {today.length>0&&<div style={{marginBottom:22}}><Accent color="#B0607A" label="Today"/>{today.map(c=><CCard key={c.id} c={c} onOpen={onOpen} onQL={onQL} logged={!!logged[c.id]}/>)}</div>}
-          {week.length>0&&(()=>{
+          {week.filter(c=>c.nad>t).length>0&&(()=>{
             const byDay={};
-            week.forEach(c=>{if(!byDay[c.nad])byDay[c.nad]=[];byDay[c.nad].push(c);});
+            week.filter(c=>c.nad>t).forEach(c=>{if(!byDay[c.nad])byDay[c.nad]=[];byDay[c.nad].push(c);});
             return Object.keys(byDay).sort().map(dateStr=>{
               const dd=daysUntil(dateStr);
               const dayLabel=dd===1?'Tomorrow':new Date(dateStr+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
