@@ -46,7 +46,7 @@ const {useState,useEffect,useRef,createContext,useContext}=React;
 
 // ── Supabase config ───────────────────────────────────────────────────────────
 const SB_URL='https://pltwmvfpdyusfboxcpwm.supabase.co';
-const SB_KEY='sb_publishable_znxBDxuBl_rDrHO2xxMxmA_fUuEha5n';
+const SB_KEY='key: sb_publishable_znxBDxuBl_rDrHO2xxMxmA_fUuEha5n';
 const USE_SB=SB_URL!=='YOUR_SUPABASE_URL'&&SB_KEY!=='YOUR_SUPABASE_PUBLISHABLE_KEY';
 const SB_ROW='sc-contacts';
 const sbLoad=async()=>{try{const r=await fetch(`${SB_URL}/rest/v1/contacts?id=eq.${SB_ROW}&select=data`,{headers:{apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`}});const rows=await r.json();if(rows&&rows.length>0&&rows[0].data)return rows[0].data;return null;}catch{return null;}};
@@ -695,7 +695,7 @@ function Dashboard({contacts,onOpen,onQL,logged,onInfo,onAdd,onUnsched,showRemin
   const active=contacts.filter(c=>!c.archived);
   const overdue=active.filter(c=>c.nad&&c.nad<t).sort((a,b)=>a.nad.localeCompare(b.nad));
   const today=active.filter(c=>c.nad===t);
-  const week=active.filter(c=>c.nad&&c.nad>t&&daysUntil(c.nad)<=7).sort((a,b)=>a.nad.localeCompare(b.nad));
+  const week=active.filter(c=>c.nad&&c.nad>=t&&daysUntil(c.nad)<=7).sort((a,b)=>a.nad.localeCompare(b.nad));
   const unsched=active.filter(c=>!c.nad);
   const bdays=active.filter(c=>bdayIn14(c.birthday)).sort((a,b)=>(bdayDays(a.birthday)||99)-(bdayDays(b.birthday)||99));
   const empty=overdue.length===0&&today.length===0&&week.length===0;
