@@ -49,13 +49,81 @@ const SB_URL='https://pltwmvfpdyusfboxcpwm.supabase.co';
 const SB_KEY='sb_publishable_znxBDxuBl_rDrHO2xxMxmA_fUuEha5n';
 const USE_SB=SB_URL!=='YOUR_SUPABASE_URL'&&SB_KEY!=='YOUR_SUPABASE_PUBLISHABLE_KEY';
 const SB_ROW='sc-contacts';
-const sbLoad=async()=>{try{const r=await fetch(`${SB_URL}/rest/v1/contacts?id=eq.${SB_ROW}&select=data`,{headers:{apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`}});const rows=await r.json();if(rows&&rows.length>0&&rows[0].data)return rows[0].data;return null;}catch{return null;}};
-const sbSave=async d=>{try{await fetch(`${SB_URL}/rest/v1/contacts`,{method:'POST',headers:{apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates'},body:JSON.stringify({id:SB_ROW,data:d,updated_at:new Date().toISOString()})});}catch{}};
 const SK='sc-v4';
+const STAMP_KEY='sc-local-stamp';   // when local was last written
+const SYNC_KEY='sc-last-sync';      // when the cloud last accepted a write
+const SNAP_KEY='sc-snapshots';      // rotating daily local backups
+
+// ── Cloud ─────────────────────────────────────────────────────────────────────
+// sbLoad returns {data,updated_at} so we can compare against local before trusting it.
+const sbLoad=async()=>{
+  try{
+    const r=await fetch(`${SB_URL}/rest/v1/contacts?id=eq.${SB_ROW}&select=data,updated_at`,{headers:{apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`}});
+    if(!r.ok)return{ok:false,reason:r.status};
+    const rows=await r.json();
+    if(rows&&rows.length>0&&rows[0].data)return{ok:true,data:rows[0].data,updated_at:rows[0].updated_at||''};
+    return{ok:true,data:null,updated_at:''};
+  }catch(e){return{ok:false,reason:'offline'};}
+};
+// sbSave now REPORTS whether the write landed. Silence was the whole problem.
+const sbSave=async d=>{
+  try{
+    const r=await fetch(`${SB_URL}/rest/v1/contacts`,{method:'POST',headers:{apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates'},body:JSON.stringify({id:SB_ROW,data:d,updated_at:new Date().toISOString()})});
+    if(!r.ok)return{ok:false,reason:r.status};
+    return{ok:true};
+  }catch(e){return{ok:false,reason:'offline'};}
+};
+
+// ── Local ─────────────────────────────────────────────────────────────────────
 const lsLoad=()=>{try{const d=localStorage.getItem(SK);return d?JSON.parse(d):null;}catch{return null;}};
-const lsSave=d=>{try{localStorage.setItem(SK,JSON.stringify(d));}catch{}};
-const loadContacts=async()=>{if(USE_SB){const d=await sbLoad();if(d)return d;}return lsLoad();};
-const saveContacts=async d=>{lsSave(d);if(USE_SB)await sbSave(d);};
+const lsSave=d=>{try{localStorage.setItem(SK,JSON.stringify(d));localStorage.setItem(STAMP_KEY,new Date().toISOString());}catch{}};
+
+// One snapshot per calendar day, five days kept. Cheap insurance against a refresh.
+const takeSnapshot=d=>{
+  try{
+    const today=new Date().toLocaleDateString('en-CA');
+    let snaps=[];
+    try{snaps=JSON.parse(localStorage.getItem(SNAP_KEY))||[];}catch{snaps=[];}
+    if(snaps.length&&snaps[0].day===today)return;
+    snaps.unshift({day:today,at:new Date().toISOString(),count:d.length,data:d});
+    snaps=snaps.slice(0,5);
+    localStorage.setItem(SNAP_KEY,JSON.stringify(snaps));
+  }catch{
+    // Quota is the likely failure. Drop the oldest and let the next save retry.
+    try{const s=JSON.parse(localStorage.getItem(SNAP_KEY))||[];localStorage.setItem(SNAP_KEY,JSON.stringify(s.slice(0,2)));}catch{}
+  }
+};
+const listSnapshots=()=>{try{return(JSON.parse(localStorage.getItem(SNAP_KEY))||[]).map(s=>({day:s.day,at:s.at,count:s.count}));}catch{return[];}};
+const getSnapshot=day=>{try{return(JSON.parse(localStorage.getItem(SNAP_KEY))||[]).find(s=>s.day===day)?.data||null;}catch{return null;}};
+
+// ── Load: local wins when local is newer ──────────────────────────────────────
+// The old version took the cloud copy whenever one existed. That is how a stale
+// cloud row silently replaced a month of local work.
+const loadContacts=async()=>{
+  const local=lsLoad();
+  const localStamp=localStorage.getItem(STAMP_KEY)||'';
+  if(!USE_SB)return{contacts:local,sync:'off'};
+  const r=await sbLoad();
+  if(!r.ok)return{contacts:local,sync:'failed',reason:r.reason};
+  localStorage.setItem(SYNC_KEY,new Date().toISOString());
+  if(r.data){
+    if(local&&localStamp&&r.updated_at&&localStamp>r.updated_at){
+      return{contacts:local,sync:'ok',conflict:{cloudAt:r.updated_at,localAt:localStamp}};
+    }
+    return{contacts:r.data,sync:'ok'};
+  }
+  return{contacts:local,sync:'ok'};
+};
+
+// ── Save: local first, always. Cloud second, and we check. ────────────────────
+const saveContacts=async d=>{
+  lsSave(d);
+  takeSnapshot(d);
+  if(!USE_SB)return{sync:'off'};
+  const r=await sbSave(d);
+  if(r.ok){localStorage.setItem(SYNC_KEY,new Date().toISOString());return{sync:'ok'};}
+  return{sync:'failed',reason:r.reason};
+};
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
 const mkTh=dk=>({
@@ -160,6 +228,16 @@ const addDays=(str,n)=>{
 const daysUntil=str=>str?Math.round((new Date(str+'T00:00:00')-new Date(todayStr()+'T00:00:00'))/86400000):null;
 const fmtDate=str=>str?new Date(str+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
 const uid=()=>Math.random().toString(36).slice(2,10);
+const fmtWhen=iso=>{
+  if(!iso)return'never';
+  const mins=Math.floor((Date.now()-new Date(iso).getTime())/60000);
+  if(mins<2)return'just now';
+  if(mins<60)return mins+' minutes ago';
+  const hrs=Math.floor(mins/60);
+  if(hrs<24)return hrs===1?'an hour ago':hrs+' hours ago';
+  const days=Math.floor(hrs/24);
+  return days===1?'yesterday':days+' days ago';
+};
 
 const fmtMet=str=>{
   if(!str)return'';
@@ -689,7 +767,7 @@ function CCard({c,onOpen,onQL,logged,dimmed}){
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
-function Dashboard({contacts,onOpen,onQL,logged,onInfo,onAdd,onUnsched,showReminder,lastExport,onExport,onDismiss,onToggleDark,view,onViewChange,period,onPeriodChange}){
+function Dashboard({contacts,onOpen,onQL,logged,onInfo,onAdd,onUnsched,showReminder,lastExport,onExport,onDismiss,onToggleDark,view,onViewChange,period,onPeriodChange,sync,lastSync}){
   const th=useTh();
   const t=todayStr();
   const active=contacts.filter(c=>!c.archived);
@@ -703,8 +781,23 @@ function Dashboard({contacts,onOpen,onQL,logged,onInfo,onAdd,onUnsched,showRemin
   const dl=new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
   const daysSince=lastExport?Math.abs(daysUntil(lastExport)):null;
 
+  const syncDays=lastSync?Math.floor((Date.now()-new Date(lastSync).getTime())/86400000):null;
+  const syncBad=USE_SB&&(sync==='failed'||lastSync===null||syncDays>=2);
+  const syncMsg=!USE_SB
+    ?'Cloud sync is not set up. This browser is the only copy.'
+    :lastSync===null
+      ?'Never reached the cloud. This browser is the only copy.'
+      :`Not syncing. Last cloud save ${syncDays===0?'today':syncDays===1?'yesterday':syncDays+' days ago'}.`;
+
   return(
     <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+      {(syncBad||!USE_SB)&&(
+        <div style={{background:'#8C2B2B',padding:'9px 16px',display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
+          <span style={{fontSize:13,flexShrink:0}}>⚠</span>
+          <span style={{fontFamily:'Inter',fontSize:11.5,color:'#F6E4E4',flex:1,lineHeight:1.4}}>{syncMsg}</span>
+          <button onClick={e=>{e.stopPropagation();onExport();}} style={{background:'rgba(255,255,255,0.15)',border:'1px solid rgba(255,255,255,0.3)',borderRadius:6,padding:'4px 11px',fontSize:10.5,cursor:'pointer',fontFamily:'Inter',fontWeight:500,color:'#fff',whiteSpace:'nowrap',flexShrink:0}}>Export now</button>
+        </div>
+      )}
       <div style={{background:th.hdr,padding:'18px 20px 14px',flexShrink:0}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
           <div>
@@ -737,7 +830,7 @@ function Dashboard({contacts,onOpen,onQL,logged,onInfo,onAdd,onUnsched,showRemin
           ))}
         </div>
       </div>
-      {showReminder&&(
+      {showReminder&&!syncBad&&(
         <div style={{background:'rgba(168,124,56,0.12)',borderBottom:'1px solid rgba(168,124,56,0.25)',padding:'10px 16px',display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
           <span style={{fontSize:12,color:'#A87C38',flex:1,fontFamily:'Inter'}}>{lastExport?`Last backup: ${daysSince} days ago.`:'Contacts not yet backed up.'} Export now?</span>
           <button onClick={e=>{e.stopPropagation();onExport();onDismiss();}} style={{background:'#A87C38',color:'#F6F1E9',border:'none',borderRadius:6,padding:'4px 12px',fontSize:11,cursor:'pointer',fontFamily:'Inter',fontWeight:500,whiteSpace:'nowrap'}}>Export</button>
@@ -1096,7 +1189,15 @@ function Add({onSave,onBack}){
 }
 
 // ── Info Panel ────────────────────────────────────────────────────────────────
-function InfoPanel({onClose,onExport,onImport,onImportCSV,lastExport,tz,onTzChange}){
+function InfoPanel({onClose,onExport,onImport,onImportCSV,lastExport,tz,onTzChange,sync,lastSync,onRestoreSnapshot}){
+  const snaps=listSnapshots();
+  const syncLine=!USE_SB
+    ?'Cloud sync is not configured. Contacts exist only in this browser, so export often.'
+    :sync==='failed'
+      ?'The cloud is refusing writes right now. Your changes are saved in this browser but are not reaching your other devices. Export a copy before clearing anything.'
+      :lastSync
+        ?`Syncing. Last confirmed cloud save ${fmtWhen(lastSync)}.`
+        :'Connected, but nothing has been written to the cloud yet.';
   const importRef=useRef();
   const csvRef=useRef();
   const daysSince=lastExport?Math.abs(daysUntil(lastExport)):null;
@@ -1116,8 +1217,11 @@ function InfoPanel({onClose,onExport,onImport,onImportCSV,lastExport,tz,onTzChan
         <div style={{fontFamily:'Cormorant Garamond',fontSize:22,fontWeight:300,color:'#F6F1E9',letterSpacing:'0.14em',marginTop:14,marginBottom:28,textTransform:'uppercase'}}>Small Circles</div>
         <div style={{textAlign:'left'}}>
           <div style={{fontFamily:'Inter',fontSize:9,letterSpacing:'0.18em',color:'#C9A870',textTransform:'uppercase',marginBottom:14}}>Data Backup</div>
+          <div style={{fontSize:11,color:sync==='failed'||!USE_SB?'rgba(255,190,190,0.8)':'rgba(246,241,233,0.45)',fontFamily:'Inter',marginBottom:10,lineHeight:1.7}}>
+            {syncLine}
+          </div>
           <div style={{fontSize:11,color:'rgba(246,241,233,0.45)',fontFamily:'Inter',marginBottom:16,lineHeight:1.7}}>
-            {USE_SB?`Syncing to Supabase — your contacts are safe across all devices.${lastExport?' Last exported '+daysSince+' days ago.':''}`:(lastExport?`Last exported ${daysSince} days ago · ${fmtDate(lastExport)}`:'Never exported — contacts exist only in this browser.')+' Export weekly and keep the file in iCloud or Google Drive.'}
+            {lastExport?`Last export: ${fmtDate(lastExport)} (${daysSince} days ago).`:'Never exported.'} A downloaded file is the only copy nothing else can touch.
           </div>
           <button onClick={e=>{e.stopPropagation();onExport();}} style={{width:'100%',padding:'10px',background:'rgba(168,124,56,0.2)',border:'1px solid rgba(168,124,56,0.45)',borderRadius:8,color:'#C9A870',fontFamily:'Inter',fontSize:12,fontWeight:500,cursor:'pointer',marginBottom:8,letterSpacing:'0.06em'}}>↓ Export contacts (JSON)</button>
           <input ref={importRef} type="file" accept=".json" style={{display:'none'}} onChange={e=>{onImport(e.target.files[0]);e.target.value='';}}/>
@@ -1128,6 +1232,22 @@ function InfoPanel({onClose,onExport,onImport,onImportCSV,lastExport,tz,onTzChan
           <button onClick={e=>{e.stopPropagation();downloadTemplate();}} style={{width:'100%',padding:'10px',background:'rgba(92,143,181,0.15)',border:'1px solid rgba(92,143,181,0.35)',borderRadius:8,color:'#C4D9EE',fontFamily:'Inter',fontSize:12,fontWeight:500,cursor:'pointer',marginBottom:8,letterSpacing:'0.06em'}}>↓ Download CSV template</button>
           <input ref={csvRef} type="file" accept=".csv" style={{display:'none'}} onChange={e=>{onImportCSV(e.target.files[0]);e.target.value='';}}/>
           <button onClick={e=>{e.stopPropagation();csvRef.current.click();}} style={{width:'100%',padding:'10px',background:'transparent',border:'1px solid rgba(92,143,181,0.25)',borderRadius:8,color:'rgba(196,217,238,0.5)',fontFamily:'Inter',fontSize:12,cursor:'pointer',letterSpacing:'0.06em',marginBottom:20}}>↑ Import from CSV</button>
+
+          {/* ── Snapshots ── */}
+          <div style={{borderTop:'1px solid rgba(201,168,112,0.15)',paddingTop:20,marginBottom:20}}>
+            <div style={{fontFamily:'Inter',fontSize:9,letterSpacing:'0.18em',color:'#C9A870',textTransform:'uppercase',marginBottom:14}}>Recent Snapshots</div>
+            <div style={{fontSize:11,color:'rgba(246,241,233,0.45)',fontFamily:'Inter',marginBottom:14,lineHeight:1.7}}>
+              Small Circles keeps a copy of your contacts once a day, five days back, in this browser. If something goes wrong you can step back to any of them.
+            </div>
+            {snaps.length===0&&<div style={{fontSize:11,color:'rgba(246,241,233,0.3)',fontFamily:'Inter',fontStyle:'italic'}}>None yet — the first one is taken next time you save.</div>}
+            {snaps.map(s=>(
+              <div key={s.day} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:'1px solid rgba(201,168,112,0.08)'}}>
+                <span style={{fontFamily:'Inter',fontSize:11,color:'rgba(246,241,233,0.6)',flex:1}}>{fmtDate(s.day)}</span>
+                <span style={{fontFamily:'Inter',fontSize:10,color:'rgba(246,241,233,0.35)'}}>{s.count} contacts</span>
+                <button onClick={e=>{e.stopPropagation();onRestoreSnapshot(s.day);}} style={{background:'transparent',border:'1px solid rgba(201,168,112,0.3)',borderRadius:6,padding:'3px 10px',fontSize:10,cursor:'pointer',fontFamily:'Inter',color:'#C9A870',whiteSpace:'nowrap'}}>Restore</button>
+              </div>
+            ))}
+          </div>
 
           {/* ── How to Use ── */}
           <div style={{borderTop:'1px solid rgba(201,168,112,0.15)',paddingTop:20,marginBottom:20}}>
@@ -1218,17 +1338,29 @@ function App(){
   const [period,setPeriod]=useState(()=>localStorage.getItem('sc-period')||'month');
   const handlePeriodChange=p=>{setPeriod(p);localStorage.setItem('sc-period',p);};
   const [tz,setTz]=useState(()=>localStorage.getItem('sc-tz')||'');
+  const [sync,setSync]=useState('ok');
+  const [lastSync,setLastSync]=useState(()=>localStorage.getItem(SYNC_KEY)||null);
   const th=mkTh(dark);
 
   useEffect(()=>{
     const t1=setTimeout(()=>setIp('fading'),4500);
     const t2=setTimeout(()=>setIp('done'),5300);
-    loadContacts().then(saved=>{setContacts((saved||DEFAULTS).map(migrateContact));});
+    loadContacts().then(res=>{
+      setContacts((res.contacts||DEFAULTS).map(migrateContact));
+      setSync(res.sync);
+      if(res.conflict)showToast('Loaded your local copy — it was newer than the cloud.');
+    });
     return()=>{clearTimeout(t1);clearTimeout(t2);};
   },[]);
 
   const handleTzChange=newTz=>{setTz(newTz);localStorage.setItem('sc-tz',newTz);};
-  const persist=next=>{setContacts(next);saveContacts(next);};
+  const persist=next=>{
+    setContacts(next);
+    saveContacts(next).then(r=>{
+      setSync(r.sync);
+      if(r.sync==='ok')setLastSync(localStorage.getItem(SYNC_KEY));
+    });
+  };
   const handleNav=k=>{setNav(k);if(k==='home'){setScreen('dashboard');}else{setFf(k==='all'?null:k);setScreen('list');}};
   const openContact=id=>{setPrev(screen);setSid(id);setScreen('detail');};
   const quickLog=id=>{
@@ -1287,15 +1419,22 @@ function App(){
     };
     r.readAsText(file);
   };
+  const doRestoreSnapshot=day=>{
+    const d=getSnapshot(day);
+    if(!d||!d.length){showToast('That snapshot could not be read');return;}
+    persist(d.map(migrateContact));
+    setInfoOpen(false);
+    showToast(`Restored ${d.length} contacts from ${fmtDate(day)}`);
+  };
   const dismissReminder=()=>{localStorage.setItem('sc-export-dismissed',todayStr());setDismissed(true);};
-  const showReminder=!dismissed&&!USE_SB&&(!lastExport||(daysUntil(lastExport)||0)<-7);
+  const showReminder=!dismissed&&(!lastExport||(daysUntil(lastExport)||0)<-14);
   const sel=contacts.find(c=>c.id===sid);
 
   return(
     <ThCtx.Provider value={th}>
       <style>{dynCSS(dark)}</style>
       {ip!=='done'&&<Intro phase={ip}/>}
-      {infoOpen&&<InfoPanel onClose={()=>setInfoOpen(false)} onExport={doExport} onImport={doImport} onImportCSV={doImportCSV} lastExport={lastExport} tz={tz} onTzChange={handleTzChange}/>}
+      {infoOpen&&<InfoPanel onClose={()=>setInfoOpen(false)} onExport={doExport} onImport={doImport} onImportCSV={doImportCSV} lastExport={lastExport} tz={tz} onTzChange={handleTzChange} sync={sync} lastSync={lastSync} onRestoreSnapshot={doRestoreSnapshot}/>}
       {toast&&(
         <div style={{position:'fixed',bottom:70,left:'50%',transform:'translateX(-50%)',background:'#16293D',color:'#C9A870',padding:'10px 20px',borderRadius:8,fontSize:12,fontFamily:'Inter',zIndex:900,whiteSpace:'nowrap',boxShadow:'0 4px 20px rgba(0,0,0,0.25)'}}>
           {toast}
@@ -1309,7 +1448,8 @@ function App(){
             onUnsched={()=>{setFf('unscheduled');setNav('all');setScreen('list');}}
             showReminder={showReminder} lastExport={lastExport} onExport={doExport} onDismiss={dismissReminder}
             onToggleDark={toggleDark} view={dashView} onViewChange={setDashView}
-            period={period} onPeriodChange={handlePeriodChange}/>
+            period={period} onPeriodChange={handlePeriodChange}
+            sync={sync} lastSync={lastSync}/>
         )}
         {screen==='list'&&(
           <List contacts={contacts} freqFilter={ff} onOpen={openContact} onQL={quickLog} logged={logged}
